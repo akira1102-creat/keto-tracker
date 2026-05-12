@@ -11,67 +11,38 @@ window.__ketoAnalysis = window.__ketoAnalysis || {
   errorMsg: '',
   imageBase64: null,
   imageMime: 'image/jpeg',
-  abortController: null,
 };
 
-function getAnalysisBar() {
-  return document.getElementById('keto-analysis-bar');
-}
-
-function renderAnalysisBar() {
-  let bar = getAnalysisBar();
-  if (!bar) {
-    bar = document.createElement('div');
-    bar.id = 'keto-analysis-bar';
-    document.getElementById('app').appendChild(bar);
-  }
+// ===== Nav badge helper =====
+export function updateNavBadge() {
+  const badge = document.querySelector('.nav-btn[data-page="record"] .nav-badge');
+  if (!badge) return;
   const s = window.__ketoAnalysis;
-  if (s.status === 'idle') {
-    bar.className = 'analysis-bar hidden';
-    return;
-  }
   if (s.status === 'running') {
-    bar.className = 'analysis-bar running';
-    bar.innerHTML = `<span class="analysis-bar-spinner"></span><span>AI 分析中…</span><button class="analysis-bar-btn" id="btn-bar-goto">查看</button>`;
+    badge.className = 'nav-badge running';
+    badge.textContent = '…';
   } else if (s.status === 'done') {
-    bar.className = 'analysis-bar done';
-    bar.innerHTML = `<span>✅ 分析完成</span><button class="analysis-bar-btn" id="btn-bar-goto">返回填寫</button><button class="analysis-bar-close" id="btn-bar-close">✕</button>`;
-  } else if (s.status === 'error') {
-    bar.className = 'analysis-bar error';
-    bar.innerHTML = `<span>⚠ ${s.errorMsg}</span><button class="analysis-bar-btn" id="btn-bar-retry">重試</button><button class="analysis-bar-close" id="btn-bar-close">✕</button>`;
+    badge.className = 'nav-badge done';
+    badge.textContent = '✓';
+  } else {
+    badge.className = 'nav-badge';
+    badge.textContent = '';
   }
-  document.getElementById('btn-bar-goto')?.addEventListener('click', () => navigate('record'));
-  document.getElementById('btn-bar-retry')?.addEventListener('click', () => {
-    window.__ketoAnalysis.status = 'idle';
-    renderAnalysisBar();
-    navigate('record');
-  });
-  document.getElementById('btn-bar-close')?.addEventListener('click', () => {
-    window.__ketoAnalysis.status = 'idle';
-    window.__ketoAnalysis.data = null;
-    renderAnalysisBar();
-  });
 }
 
 // ===== Background fetch detection =====
-// If iOS suspends JS and kills the fetch, the promise will reject.
-// But if the app returns to foreground and status is still 'running' after a
-// grace period, we treat it as a dead fetch and surface a retry prompt.
 let _bgCheckTimer = null;
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     const s = window.__ketoAnalysis;
     if (s.status === 'running') {
-      // Give the promise 3 seconds to self-resolve/reject after returning to foreground.
-      // If it's still 'running' after that, iOS likely killed the fetch silently.
       clearTimeout(_bgCheckTimer);
       _bgCheckTimer = setTimeout(() => {
         if (window.__ketoAnalysis.status === 'running') {
           window.__ketoAnalysis.status = 'error';
           window.__ketoAnalysis.errorMsg = '後台中斷，請重試';
-          renderAnalysisBar();
-          // If record page is mounted, update its UI too
+          updateNavBadge();
           const analyzingSection = document.getElementById('analyzing-section');
           const manualSection = document.getElementById('manual-section');
           if (analyzingSection) analyzingSection.classList.add('hidden');
@@ -81,7 +52,6 @@ document.addEventListener('visibilitychange', () => {
       }, 3000);
     }
   } else {
-    // Going to background — record the time so we can assess on return
     if (window.__ketoAnalysis.status === 'running') {
       window.__ketoAnalysis._bgAt = Date.now();
     }
@@ -132,7 +102,6 @@ export function renderRecord(container) {
       </div>
     </div>
 
-    <!-- Analyzing in-progress inline card -->
     <div id="analyzing-section" class="hidden">
       <div class="card" style="display:flex;align-items:center;gap:14px;padding:18px 16px">
         <div class="spinner" style="width:28px;height:28px;border-width:3px;flex-shrink:0"></div>
@@ -140,7 +109,6 @@ export function renderRecord(container) {
           <div style="font-weight:700;font-size:15px">AI 分析中…</div>
           <div style="font-size:12px;color:var(--color-text-muted);margin-top:2px">可先去其他頁面查看資料</div>
         </div>
-        <button class="btn btn-outline btn-sm" id="btn-minimize">折疊</button>
       </div>
     </div>
 
@@ -268,7 +236,7 @@ export function renderRecord(container) {
   const recordDateInput = document.getElementById('record-date');
   const dateHint = document.getElementById('date-hint');
 
-  // Restore state on return
+  // Restore state on return from another page
   if (s.status === 'running') {
     uploadSection.classList.add('hidden');
     analyzingSection.classList.remove('hidden');
@@ -282,6 +250,11 @@ export function renderRecord(container) {
     analysisData = s.data;
   } else if (s.status === 'error') {
     manualSection.classList.remove('hidden');
+  }
+
+  // Clear done badge once user returns to record page
+  if (s.status === 'done') {
+    updateNavBadge();
   }
 
   function updateDateHint() {
@@ -305,18 +278,11 @@ export function renderRecord(container) {
   document.getElementById('btn-remove-img').addEventListener('click', resetToUpload);
   document.getElementById('btn-analyze').addEventListener('click', doAnalyze);
 
-  // Minimize / collapse: hide the analyzing card, show the floating bar, navigate away
-  document.getElementById('btn-minimize')?.addEventListener('click', () => {
-    analyzingSection.classList.add('hidden');
-    renderAnalysisBar(); // bar is already running state — just ensure it's visible
-    navigate('dashboard');
-  });
-
   document.getElementById('btn-reanalyze').addEventListener('click', () => {
     resultSection.classList.add('hidden');
     window.__ketoAnalysis.status = 'idle';
     window.__ketoAnalysis.data = null;
-    renderAnalysisBar();
+    updateNavBadge();
     uploadSection.classList.remove('hidden');
   });
   document.getElementById('btn-save-meal').addEventListener('click', saveMeal);
@@ -351,7 +317,7 @@ export function renderRecord(container) {
     window.__ketoAnalysis.status = 'idle';
     window.__ketoAnalysis.data = null;
     window.__ketoAnalysis.imageBase64 = null;
-    renderAnalysisBar();
+    updateNavBadge();
     uploadSection.classList.remove('hidden');
     previewSection.classList.add('hidden');
     resultSection.classList.add('hidden');
@@ -364,37 +330,30 @@ export function renderRecord(container) {
     const apiKey = localStorage.getItem('keto_claude_api_key');
     if (!apiKey) { showToast('請先在設定頁面輸入 Gemini API Key'); return; }
 
-    // Switch to analyzing state
     previewSection.classList.add('hidden');
     analyzingSection.classList.remove('hidden');
     window.__ketoAnalysis.status = 'running';
     window.__ketoAnalysis.data = null;
     window.__ketoAnalysis.errorMsg = '';
     window.__ketoAnalysis._bgAt = null;
-    renderAnalysisBar();
+    updateNavBadge();
 
     try {
       const result = await analyzeImage(currentImageBase64, currentMimeType);
 
-      // Clear any pending background check
       clearTimeout(_bgCheckTimer);
-
-      // If background killed the fetch and we already flipped to error, ignore late resolve
       if (window.__ketoAnalysis.status !== 'running') return;
 
       analysisData = result;
       window.__ketoAnalysis.status = 'done';
       window.__ketoAnalysis.data = result;
-      renderAnalysisBar();
+      updateNavBadge();
 
-      // If still on record page, show result inline
       analyzingSection.classList.add('hidden');
       renderResult(result);
       resultSection.classList.remove('hidden');
     } catch (err) {
       clearTimeout(_bgCheckTimer);
-
-      // Already handled by visibilitychange — don't double-toast
       if (window.__ketoAnalysis.status === 'error') return;
 
       let msg = '分析失敗，請重試';
@@ -405,7 +364,7 @@ export function renderRecord(container) {
       else if (/AbortError/i.test(err.name)) msg = '後台中斷，請重試';
       window.__ketoAnalysis.status = 'error';
       window.__ketoAnalysis.errorMsg = msg;
-      renderAnalysisBar();
+      updateNavBadge();
       analyzingSection.classList.add('hidden');
       showToast(msg);
       manualSection.classList.remove('hidden');
@@ -470,7 +429,7 @@ export function renderRecord(container) {
     window.__ketoAnalysis.status = 'idle';
     window.__ketoAnalysis.data = null;
     window.__ketoAnalysis.imageBase64 = null;
-    renderAnalysisBar();
+    updateNavBadge();
     persistMeal(meal, dateStr);
   }
 
@@ -502,9 +461,6 @@ export function renderRecord(container) {
     showToast(isToday ? '✓ 餐點已儲存' : `✓ 已証入 ${dateStr} 的記錄`);
     setTimeout(() => navigate('dashboard'), 800);
   }
-
-  // Render bar whenever record page mounts
-  renderAnalysisBar();
 }
 
 async function compressImage(file) {
