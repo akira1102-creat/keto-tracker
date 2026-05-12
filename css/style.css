@@ -83,11 +83,32 @@ body {
   transition: color var(--transition);
   padding: 8px 0;
   -webkit-tap-highlight-color: transparent;
+  position: relative;
 }
 .nav-btn.active { color: var(--color-primary-light); }
 .nav-btn:active { opacity: 0.7; }
 .nav-icon { font-size: 22px; line-height: 1; }
 .nav-label { font-size: 10px; font-family: 'Noto Sans TC', sans-serif; }
+
+/* Nav badge for analysis status */
+.nav-badge {
+  position: absolute;
+  top: 6px; right: calc(50% - 18px);
+  min-width: 16px; height: 16px;
+  border-radius: 8px;
+  font-size: 9px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 4px;
+  pointer-events: none;
+}
+.nav-badge.running {
+  background: var(--color-amber);
+  color: #000;
+}
+.nav-badge.done {
+  background: var(--color-success);
+  color: #fff;
+}
 
 /* ===== Page Container ===== */
 .page { padding: 16px; max-width: 500px; margin: 0 auto; }
@@ -217,16 +238,67 @@ body {
   font-size: 16px;
 }
 
-/* Analyzing overlay */
-.analyzing-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.85);
-  display: flex; align-items: center; justify-content: center;
-  flex-direction: column; gap: 16px;
-  z-index: 500;
+/* ===== Analysis Bar (replaces full-screen overlay) ===== */
+.analysis-bar {
+  position: fixed;
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + 8px);
+  left: 12px; right: 12px;
+  max-width: 476px;
+  margin: 0 auto;
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 14px; font-weight: 600;
+  z-index: 300;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  transition: transform 0.3s ease, opacity 0.3s ease;
 }
-.analyzing-overlay .spinner { width: 48px; height: 48px; border-width: 4px; }
-.analyzing-overlay p { font-size: 16px; color: var(--color-text-muted); }
+.analysis-bar.hidden {
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(12px);
+}
+.analysis-bar.running {
+  background: var(--color-surface);
+  border: 1px solid var(--color-amber);
+  color: var(--color-text);
+}
+.analysis-bar.done {
+  background: var(--color-surface);
+  border: 1px solid var(--color-success);
+  color: var(--color-success);
+}
+.analysis-bar.error {
+  background: var(--color-surface);
+  border: 1px solid var(--color-danger);
+  color: var(--color-danger);
+}
+.analysis-bar > span:first-child { flex: 1; }
+.analysis-bar-spinner {
+  width: 18px; height: 18px; flex-shrink: 0;
+  border: 2px solid rgba(212,160,23,0.3);
+  border-top-color: var(--color-amber);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+.analysis-bar-btn {
+  background: none;
+  border: 1px solid currentColor;
+  color: inherit;
+  border-radius: 6px;
+  padding: 5px 11px;
+  font-size: 12px; font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: 'Noto Sans TC', sans-serif;
+}
+.analysis-bar-close {
+  background: none; border: none;
+  color: var(--color-text-muted);
+  cursor: pointer; font-size: 14px; padding: 2px 4px;
+  font-family: 'Noto Sans TC', sans-serif;
+}
 
 /* Analysis Result */
 .result-card { background: var(--color-surface); border-radius: var(--radius); overflow: hidden; }

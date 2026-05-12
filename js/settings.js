@@ -2,7 +2,7 @@ import { getLocalProfile, saveLocalProfile } from './store.js';
 import { getTodayStr } from './store.js';
 import { showToast } from './camera.js';
 
-const APP_VERSION = 'v2.2.3';
+const APP_VERSION = 'v2.2.4';
 
 export function renderSettings(container) {
   const profile = getLocalProfile();

@@ -4,8 +4,74 @@ import { navigate } from './router.js';
 
 const MAX_DIM = 1024;
 
+// ===== Global analysis state (persists across page navigations) =====
+window.__ketoAnalysis = window.__ketoAnalysis || {
+  status: 'idle', // idle | running | done | error
+  data: null,
+  errorMsg: '',
+  imageBase64: null,
+  imageMime: 'image/jpeg',
+  abortController: null,
+};
+
+function getAnalysisBar() {
+  return document.getElementById('keto-analysis-bar');
+}
+
+function renderAnalysisBar() {
+  let bar = getAnalysisBar();
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'keto-analysis-bar';
+    document.getElementById('app').appendChild(bar);
+  }
+  const s = window.__ketoAnalysis;
+  if (s.status === 'idle') {
+    bar.className = 'analysis-bar hidden';
+    return;
+  }
+  if (s.status === 'running') {
+    bar.className = 'analysis-bar running';
+    bar.innerHTML = `<span class="analysis-bar-spinner"></span><span>AI 分析中…</span><button class="analysis-bar-btn" id="btn-bar-goto">查看</button>`;
+  } else if (s.status === 'done') {
+    bar.className = 'analysis-bar done';
+    bar.innerHTML = `<span>✓ 分析完成</span><button class="analysis-bar-btn" id="btn-bar-goto">返回填寫</button><button class="analysis-bar-close" id="btn-bar-close">✕</button>`;
+  } else if (s.status === 'error') {
+    bar.className = 'analysis-bar error';
+    bar.innerHTML = `<span>⚠ ${s.errorMsg}</span><button class="analysis-bar-btn" id="btn-bar-retry">重試</button><button class="analysis-bar-close" id="btn-bar-close">✕</button>`;
+  }
+  document.getElementById('btn-bar-goto')?.addEventListener('click', () => navigate('record'));
+  document.getElementById('btn-bar-retry')?.addEventListener('click', () => {
+    window.__ketoAnalysis.status = 'idle';
+    renderAnalysisBar();
+    navigate('record');
+  });
+  document.getElementById('btn-bar-close')?.addEventListener('click', () => {
+    window.__ketoAnalysis.status = 'idle';
+    window.__ketoAnalysis.data = null;
+    renderAnalysisBar();
+  });
+}
+
+// Watch visibility — if page comes back from background and fetch died, show retry
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    const s = window.__ketoAnalysis;
+    if (s.status === 'running') {
+      // Check if the AbortController is still alive after a grace period
+      setTimeout(() => {
+        if (window.__ketoAnalysis.status === 'running') {
+          // Still running after 2s — could be fine; do nothing.
+          // If fetch was killed by iOS, the promise will reject and status changes to error automatically.
+        }
+      }, 2000);
+    }
+  }
+});
+
 export function renderRecord(container) {
   const todayStr = getTodayStr();
+  const s = window.__ketoAnalysis;
 
   container.innerHTML = `
   <div class="page">
@@ -42,7 +108,21 @@ export function renderRecord(container) {
         <img id="preview-img" src="" alt="食物圖片">
         <button class="image-preview-remove" id="btn-remove-img">✕</button>
       </div>
-      <button class="btn btn-primary" id="btn-analyze">🔍 開始分析</button>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" id="btn-analyze" style="flex:1">🔍 開始分析</button>
+      </div>
+    </div>
+
+    <!-- Analyzing in-progress inline card -->
+    <div id="analyzing-section" class="hidden">
+      <div class="card" style="display:flex;align-items:center;gap:14px;padding:18px 16px">
+        <div class="spinner" style="width:28px;height:28px;border-width:3px;flex-shrink:0"></div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:15px">AI 分析中…</div>
+          <div style="font-size:12px;color:var(--color-text-muted);margin-top:2px">可先去其他頁面查看資料</div>
+        </div>
+        <button class="btn btn-outline btn-sm" id="btn-minimize">折疊</button>
+      </div>
     </div>
 
     <div id="result-section" class="hidden">
@@ -154,12 +234,13 @@ export function renderRecord(container) {
     <button class="btn btn-outline mt-12" id="btn-manual-toggle" style="font-size:13px">✍️ 手動輸入</button>
   </div>`;
 
-  let currentImageBase64 = null;
-  let currentMimeType = 'image/jpeg';
-  let analysisData = null;
+  let currentImageBase64 = s.imageBase64 || null;
+  let currentMimeType = s.imageMime || 'image/jpeg';
+  let analysisData = s.data || null;
 
   const uploadSection = document.getElementById('upload-section');
   const previewSection = document.getElementById('preview-section');
+  const analyzingSection = document.getElementById('analyzing-section');
   const resultSection = document.getElementById('result-section');
   const manualSection = document.getElementById('manual-section');
   const previewImg = document.getElementById('preview-img');
@@ -168,7 +249,22 @@ export function renderRecord(container) {
   const recordDateInput = document.getElementById('record-date');
   const dateHint = document.getElementById('date-hint');
 
-  // 更新日期提示文字
+  // Restore state on return
+  if (s.status === 'running') {
+    uploadSection.classList.add('hidden');
+    analyzingSection.classList.remove('hidden');
+    if (currentImageBase64) {
+      previewImg.src = `data:${currentMimeType};base64,${currentImageBase64}`;
+    }
+  } else if (s.status === 'done' && s.data) {
+    uploadSection.classList.add('hidden');
+    renderResult(s.data);
+    resultSection.classList.remove('hidden');
+    analysisData = s.data;
+  } else if (s.status === 'error') {
+    manualSection.classList.remove('hidden');
+  }
+
   function updateDateHint() {
     const val = recordDateInput.value;
     if (val === todayStr) {
@@ -181,9 +277,7 @@ export function renderRecord(container) {
   }
   recordDateInput.addEventListener('change', updateDateHint);
 
-  function getSelectedDate() {
-    return recordDateInput.value || todayStr;
-  }
+  function getSelectedDate() { return recordDateInput.value || todayStr; }
 
   document.getElementById('btn-camera').addEventListener('click', () => fileCam.click());
   document.getElementById('btn-gallery').addEventListener('click', () => fileGal.click());
@@ -191,14 +285,18 @@ export function renderRecord(container) {
   fileGal.addEventListener('change', e => handleFile(e.target.files[0]));
   document.getElementById('btn-remove-img').addEventListener('click', resetToUpload);
   document.getElementById('btn-analyze').addEventListener('click', doAnalyze);
+  document.getElementById('btn-minimize')?.addEventListener('click', () => navigate('dashboard'));
   document.getElementById('btn-reanalyze').addEventListener('click', () => {
     resultSection.classList.add('hidden');
-    previewSection.classList.remove('hidden');
+    window.__ketoAnalysis.status = 'idle';
+    window.__ketoAnalysis.data = null;
+    renderAnalysisBar();
+    uploadSection.classList.remove('hidden');
   });
   document.getElementById('btn-save-meal').addEventListener('click', saveMeal);
   document.getElementById('btn-save-manual').addEventListener('click', saveManual);
   document.getElementById('btn-manual-toggle').addEventListener('click', () => manualSection.classList.toggle('hidden'));
-  document.getElementById('serving-multiplier').addEventListener('input', updateServing);
+  document.getElementById('serving-multiplier')?.addEventListener('input', updateServing);
 
   const zone = document.getElementById('upload-zone');
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
@@ -213,17 +311,25 @@ export function renderRecord(container) {
     if (!file) return;
     currentMimeType = file.type || 'image/jpeg';
     currentImageBase64 = await compressImage(file);
+    window.__ketoAnalysis.imageBase64 = currentImageBase64;
+    window.__ketoAnalysis.imageMime = currentMimeType;
     previewImg.src = `data:${currentMimeType};base64,${currentImageBase64}`;
     uploadSection.classList.add('hidden');
     resultSection.classList.add('hidden');
+    analyzingSection.classList.add('hidden');
     previewSection.classList.remove('hidden');
   }
 
   function resetToUpload() {
     currentImageBase64 = null; analysisData = null; previewImg.src = '';
+    window.__ketoAnalysis.status = 'idle';
+    window.__ketoAnalysis.data = null;
+    window.__ketoAnalysis.imageBase64 = null;
+    renderAnalysisBar();
     uploadSection.classList.remove('hidden');
     previewSection.classList.add('hidden');
     resultSection.classList.add('hidden');
+    analyzingSection.classList.add('hidden');
     fileCam.value = ''; fileGal.value = '';
   }
 
@@ -231,22 +337,38 @@ export function renderRecord(container) {
     if (!currentImageBase64) return;
     const apiKey = localStorage.getItem('keto_claude_api_key');
     if (!apiKey) { showToast('請先在設定頁面輸入 Gemini API Key'); return; }
-    const overlay = document.createElement('div');
-    overlay.className = 'analyzing-overlay';
-    overlay.innerHTML = `<div class="spinner"></div><p>AI 分析中，請稍候…</p>`;
-    document.getElementById('app').appendChild(overlay);
+
+    // Switch to analyzing state
+    previewSection.classList.add('hidden');
+    analyzingSection.classList.remove('hidden');
+    window.__ketoAnalysis.status = 'running';
+    window.__ketoAnalysis.data = null;
+    window.__ketoAnalysis.errorMsg = '';
+    renderAnalysisBar();
+
     try {
-      analysisData = await analyzeImage(currentImageBase64, currentMimeType);
-      previewSection.classList.add('hidden');
-      renderResult(analysisData);
+      const result = await analyzeImage(currentImageBase64, currentMimeType);
+      analysisData = result;
+      window.__ketoAnalysis.status = 'done';
+      window.__ketoAnalysis.data = result;
+      renderAnalysisBar();
+
+      // If still on record page, show result
+      analyzingSection.classList.add('hidden');
+      renderResult(result);
       resultSection.classList.remove('hidden');
     } catch (err) {
-      if (err.message === 'NO_API_KEY') showToast('請先在設定頁面輸入 API Key');
-      else if (err.message === 'PARSE_ERROR') showToast('分析結果格式異常，請重試或手動輸入');
-      else showToast(`分析失敗：${err.message}`);
+      let msg = '分析失敗，請重試';
+      if (err.message === 'NO_API_KEY') msg = '請先設定 API Key';
+      else if (err.message === 'PARSE_ERROR') msg = '格式異常，請重試';
+      else if (/timeout|time.?out|timedout/i.test(err.message)) msg = '分析逾時，請重試';
+      else if (/network|fetch/i.test(err.message)) msg = '網絡中斷，請重試';
+      window.__ketoAnalysis.status = 'error';
+      window.__ketoAnalysis.errorMsg = msg;
+      renderAnalysisBar();
+      analyzingSection.classList.add('hidden');
+      showToast(msg);
       manualSection.classList.remove('hidden');
-    } finally {
-      overlay.remove();
     }
   }
 
@@ -275,25 +397,27 @@ export function renderRecord(container) {
   }
 
   function updateServing() {
-    if (!analysisData) return;
+    const data = window.__ketoAnalysis.data || analysisData;
+    if (!data) return;
     const mult = parseFloat(document.getElementById('serving-multiplier').value) || 1;
-    document.getElementById('r-calories').textContent = Math.round(analysisData.calories * mult);
-    document.getElementById('r-fat').textContent = (analysisData.fat_g * mult).toFixed(1);
-    document.getElementById('r-protein').textContent = (analysisData.protein_g * mult).toFixed(1);
-    document.getElementById('r-carb').textContent = (analysisData.carb_g * mult).toFixed(1);
-    document.getElementById('edit-calories').value = Math.round(analysisData.calories * mult);
-    document.getElementById('edit-fat').value = (analysisData.fat_g * mult).toFixed(1);
-    document.getElementById('edit-protein').value = (analysisData.protein_g * mult).toFixed(1);
-    document.getElementById('edit-carb').value = (analysisData.carb_g * mult).toFixed(1);
-    document.getElementById('edit-fiber').value = (analysisData.fiber_g * mult).toFixed(1);
+    document.getElementById('r-calories').textContent = Math.round(data.calories * mult);
+    document.getElementById('r-fat').textContent = (data.fat_g * mult).toFixed(1);
+    document.getElementById('r-protein').textContent = (data.protein_g * mult).toFixed(1);
+    document.getElementById('r-carb').textContent = (data.carb_g * mult).toFixed(1);
+    document.getElementById('edit-calories').value = Math.round(data.calories * mult);
+    document.getElementById('edit-fat').value = (data.fat_g * mult).toFixed(1);
+    document.getElementById('edit-protein').value = (data.protein_g * mult).toFixed(1);
+    document.getElementById('edit-carb').value = (data.carb_g * mult).toFixed(1);
+    document.getElementById('edit-fiber').value = (data.fiber_g * mult).toFixed(1);
   }
 
   async function saveMeal() {
     const dateStr = getSelectedDate();
+    const data = window.__ketoAnalysis.data || analysisData;
     const meal = {
       id: Date.now().toString(),
       timestamp: new Date().toISOString(),
-      food_name: document.getElementById('edit-name').value || analysisData?.food_name || '未知食物',
+      food_name: document.getElementById('edit-name').value || data?.food_name || '未知食物',
       calories: Number(document.getElementById('edit-calories').value) || 0,
       fat_g: Number(document.getElementById('edit-fat').value) || 0,
       protein_g: Number(document.getElementById('edit-protein').value) || 0,
@@ -301,8 +425,12 @@ export function renderRecord(container) {
       fiber_g: Number(document.getElementById('edit-fiber').value) || 0,
       image_base64: currentImageBase64 ? await makeThumbnail(currentImageBase64, currentMimeType) : null,
       source: 'camera',
-      notes: analysisData?.notes || '',
+      notes: data?.notes || '',
     };
+    window.__ketoAnalysis.status = 'idle';
+    window.__ketoAnalysis.data = null;
+    window.__ketoAnalysis.imageBase64 = null;
+    renderAnalysisBar();
     persistMeal(meal, dateStr);
   }
 
@@ -334,6 +462,9 @@ export function renderRecord(container) {
     showToast(isToday ? '✓ 餐點已儲存' : `✓ 已証入 ${dateStr} 的記錄`);
     setTimeout(() => navigate('dashboard'), 800);
   }
+
+  // Render bar whenever record page mounts
+  renderAnalysisBar();
 }
 
 async function compressImage(file) {

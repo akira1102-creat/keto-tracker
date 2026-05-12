@@ -14,15 +14,45 @@ function showApp() {
 }
 
 try {
-  // ===== 即刻顯示 App（本地模式） =====
   showApp();
 
-  // ===== Navigation =====
   registerPages({ record: renderRecord, dashboard: renderDashboard, history: renderHistory, settings: renderSettings });
+
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => navigate(btn.dataset.page));
   });
+
   navigate('record');
+
+  // Update nav badge for analysis state
+  function updateNavBadge() {
+    const s = window.__ketoAnalysis;
+    const recordBtn = document.querySelector('.nav-btn[data-page="record"]');
+    if (!recordBtn) return;
+    let badge = recordBtn.querySelector('.nav-badge');
+    if (s.status === 'idle' || !s.status) {
+      if (badge) badge.remove();
+      return;
+    }
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'nav-badge';
+      recordBtn.appendChild(badge);
+    }
+    if (s.status === 'running') {
+      badge.className = 'nav-badge running';
+      badge.textContent = '…';
+    } else if (s.status === 'done') {
+      badge.className = 'nav-badge done';
+      badge.textContent = '✓';
+    } else if (s.status === 'error') {
+      badge.className = 'nav-badge running';
+      badge.textContent = '!';
+    }
+  }
+
+  // Poll badge state every second
+  setInterval(updateNavBadge, 1000);
 
   // ===== PWA Install =====
   let deferredInstallPrompt = null;
@@ -43,7 +73,6 @@ try {
   });
 
 } catch (err) {
-  // 萬一任何 JS 錯誤，都強制顯示主畫面，唔會卡住
   console.error('[keto] app init error:', err);
   showApp();
 }
@@ -53,7 +82,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/keto-tracker/sw.js').catch(() => {});
 }
 
-// ===== Firebase（背景載入，唔影響主流程） =====
+// ===== Firebase（背景載入） =====
 window.__ketoUser = null;
 window.ketoSignIn = async () => {
   const { signInWithGoogle } = await import('./firebase.js');
