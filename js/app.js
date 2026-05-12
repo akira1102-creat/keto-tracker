@@ -5,6 +5,9 @@ import { renderHistory } from './history.js';
 import { renderSettings } from './settings.js';
 import { navigate, registerPages } from './router.js';
 
+// 通知 HTML 取消硬性 timer
+if (window.__clearSplashTimer) window.__clearSplashTimer();
+
 // ===== PWA Install =====
 let deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
@@ -83,7 +86,7 @@ function showAuthOverlay() {
       try {
         await signInWithGoogle();
       } catch (e) {
-        btn.textContent = '登入失敗，請重試';
+        btn.innerHTML = '登入失敗，請重試';
         btn.disabled = false;
       }
     });
@@ -98,16 +101,8 @@ function hideAuthOverlay() {
 
 // ===== Init =====
 async function init() {
-  // 安全保護：5秒內如果 Firebase 未回應，直接顯示登入畫面
-  const safetyTimer = setTimeout(() => {
-    hideSplash();
-    showAuthOverlay();
-  }, 5000);
-
   try {
-    // 設定 auth state 監聽器（只登記一次）
     onAuthChange(user => {
-      clearTimeout(safetyTimer);
       hideSplash();
       if (user) {
         hideAuthOverlay();
@@ -118,11 +113,9 @@ async function init() {
         showAuthOverlay();
       }
     });
-
     await initFirebase();
   } catch (e) {
-    clearTimeout(safetyTimer);
-    console.warn('Firebase init failed, running offline:', e.message);
+    console.warn('Firebase init failed:', e.message);
     hideSplash();
     showApp();
     navigate('record');
@@ -131,6 +124,4 @@ async function init() {
 
 init();
 
-window.ketoSignOut = async () => {
-  await signOutUser();
-};
+window.ketoSignOut = async () => { await signOutUser(); };

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2.1.1';
+const CACHE_VERSION = 'v2.1.2';
 const CACHE_NAME = `keto-tracker-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/keto-tracker/',
@@ -32,14 +32,8 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  if (
-    url.hostname.includes('anthropic') ||
-    url.hostname.includes('firebase') ||
-    url.hostname.includes('googleapis') ||
-    url.hostname.includes('generativelanguage') ||
-    url.hostname.includes('gstatic') ||
-    url.hostname.includes('google')
-  ) return;
+  // 放行所有外部請求（Firebase、Google、CDN等）
+  if (url.origin !== self.location.origin) return;
 
   e.respondWith(
     caches.match(e.request).then(cached => {
