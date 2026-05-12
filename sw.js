@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2.3.0';
+const CACHE_VERSION = 'v2.3.1';
 const CACHE_NAME = `keto-tracker-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/keto-tracker/',
@@ -16,7 +16,6 @@ const STATIC_ASSETS = [
   '/keto-tracker/manifest.json',
 ];
 
-// Domains that must NEVER be intercepted by SW (auth redirects, Firebase, CDNs)
 const BYPASS_ORIGINS = [
   'accounts.google.com',
   'oauth2.googleapis.com',
@@ -52,7 +51,6 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // Bypass: non-GET, external auth/API origins, chrome-extension, etc.
   if (e.request.method !== 'GET') return;
   if (BYPASS_ORIGINS.some(d => url.hostname === d || url.hostname.endsWith('.' + d))) return;
   if (url.origin !== self.location.origin) return;

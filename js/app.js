@@ -41,10 +41,10 @@ try {
     }
     if (s.status === 'running') {
       badge.className = 'nav-badge running';
-      badge.textContent = '…';
+      badge.textContent = '\u2026';
     } else if (s.status === 'done') {
       badge.className = 'nav-badge done';
-      badge.textContent = '✓';
+      badge.textContent = '\u2713';
     } else if (s.status === 'error') {
       badge.className = 'nav-badge running';
       badge.textContent = '!';
@@ -82,12 +82,36 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/keto-tracker/sw.js').catch(() => {});
 }
 
-// ===== Firebase（背景載入） =====
+// ===== Firebase =====
+// Always initialise Firebase on load:
+// 1. so auth is ready when user taps Sign In (signInWithRedirect needs auth != null)
+// 2. so getRedirectResult() runs after returning from Google OAuth redirect
 window.__ketoUser = null;
+let _firebaseReady = null; // cached init promise
+
+function ensureFirebase() {
+  if (!_firebaseReady) {
+    _firebaseReady = import('./firebase.js').then(({ initFirebase, onAuthChange }) => {
+      onAuthChange(user => {
+        window.__ketoUser = user || null;
+      });
+      return initFirebase(); // resolves with user (or null) after getRedirectResult
+    });
+  }
+  return _firebaseReady;
+}
+
+// Kick off silently in background — does NOT block app startup
+ensureFirebase().then(user => {
+  if (user) window.__ketoUser = user;
+}).catch(() => {}); // network-less environment: silently ignore
+
 window.ketoSignIn = async () => {
-  const { signInWithGoogle } = await import('./firebase.js');
-  return signInWithGoogle();
+  const { signInWithGoogle } = await ensureFirebase().then(() => import('./firebase.js'));
+  // signInWithGoogle() calls signInWithRedirect — navigates away, never resolves
+  await signInWithGoogle();
 };
+
 window.ketoSignOut = async () => {
   const { signOutUser } = await import('./firebase.js');
   await signOutUser();
