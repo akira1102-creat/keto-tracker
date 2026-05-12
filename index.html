@@ -9,7 +9,8 @@
   <meta name="apple-mobile-web-app-title" content="酮食記">
   <title>酮食記 — 生酮飲食追蹤</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <!-- Apple Touch Icon (SVG fallback) -->
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
@@ -17,22 +18,25 @@
 </head>
 <body>
   <div id="app">
-    <!-- 載入中 -->
     <div id="splash-screen" class="splash">
       <div class="splash-content">
-        <div class="splash-icon">🥑</div>
+        <!-- SVG Logo inline -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="80" height="80" style="margin-bottom:12px">
+          <rect width="192" height="192" rx="38" fill="#0f1412"/>
+          <circle cx="96" cy="96" r="72" fill="none" stroke="#1a5c38" stroke-width="3" opacity="0.5"/>
+          <path d="M96 38 C96 38 118 62 118 82 C118 100 108 108 108 108 C108 90 96 84 88 72 C84 88 90 100 84 112 C76 104 72 94 72 82 C72 62 96 38 96 38Z" fill="#4caf50" opacity="0.95"/>
+          <path d="M96 58 C96 58 110 74 110 86 C110 96 104 102 104 102 C104 90 96 84 91 76 C89 86 93 94 89 103 C84 97 82 90 82 84 C82 70 96 58 96 58Z" fill="#d4a017" opacity="0.9"/>
+          <path d="M80 128 C80 128 88 118 96 120 C104 118 112 128 112 128 C112 128 104 138 96 136 C88 138 80 128 80 128Z" fill="#1a5c38" stroke="#4caf50" stroke-width="1.5"/>
+          <text x="96" y="160" font-family="sans-serif" font-weight="700" font-size="18" fill="#4caf50" text-anchor="middle" opacity="0.8" letter-spacing="4">酮</text>
+        </svg>
         <h1>酮食記</h1>
         <p>生酮飲食追蹤</p>
         <div class="spinner"></div>
       </div>
     </div>
 
-    <!-- 主內容區 -->
-    <main id="main-content" class="hidden">
-      <!-- 各頁面透過 JS 動態載入 -->
-    </main>
+    <main id="main-content" class="hidden"></main>
 
-    <!-- 底部導航 -->
     <nav id="bottom-nav" class="bottom-nav hidden">
       <button class="nav-btn active" data-page="record">
         <span class="nav-icon">📷</span>
@@ -53,16 +57,13 @@
     </nav>
   </div>
 
-  <!-- 安裝 PWA 提示 -->
   <div id="install-prompt" class="install-prompt hidden">
     <span>加入主畫面，隨時快速記錄</span>
     <button id="install-btn">安裝</button>
     <button id="install-dismiss">✕</button>
   </div>
 
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <!-- Firebase -->
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

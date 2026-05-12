@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" rx="38" fill="#0f1412"/>
+  <circle cx="96" cy="96" r="72" fill="none" stroke="#1a5c38" stroke-width="3" opacity="0.4"/>
+  <path d="M96 38 C96 38 118 62 118 82 C118 100 108 108 108 108 C108 90 96 84 88 72 C84 88 90 100 84 112 C76 104 72 94 72 82 C72 62 96 38 96 38Z" fill="#4caf50" opacity="0.9"/>
+  <path d="M96 58 C96 58 110 74 110 86 C110 96 104 102 104 102 C104 90 96 84 91 76 C89 86 93 94 89 103 C84 97 82 90 82 84 C82 70 96 58 96 58Z" fill="#d4a017" opacity="0.85"/>
+  <path d="M80 128 C80 128 88 118 96 120 C104 118 112 128 112 128 C112 128 104 138 96 136 C88 138 80 128 80 128Z" fill="#1a5c38" stroke="#4caf50" stroke-width="1.5"/>
+  <text x="96" y="160" font-family="sans-serif" font-weight="700" font-size="18" fill="#4caf50" text-anchor="middle" opacity="0.7" letter-spacing="4">酮</text>
+</svg>

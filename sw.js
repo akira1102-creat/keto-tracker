@@ -1,21 +1,24 @@
-const CACHE_NAME = 'keto-tracker-v1';
+const CACHE_VERSION = 'v2.0.1';
+const CACHE_NAME = `keto-tracker-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/css/style.css',
-  '/js/app.js',
-  '/js/camera.js',
-  '/js/claude.js',
-  '/js/firebase.js',
-  '/js/dashboard.js',
-  '/js/history.js',
-  '/js/settings.js',
-  '/manifest.json',
+  '/keto-tracker/',
+  '/keto-tracker/index.html',
+  '/keto-tracker/css/style.css',
+  '/keto-tracker/js/app.js',
+  '/keto-tracker/js/camera.js',
+  '/keto-tracker/js/claude.js',
+  '/keto-tracker/js/firebase.js',
+  '/keto-tracker/js/dashboard.js',
+  '/keto-tracker/js/history.js',
+  '/keto-tracker/js/settings.js',
+  '/keto-tracker/manifest.json',
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(STATIC_ASSETS))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -29,10 +32,13 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  // Don't cache API calls
-  if (url.hostname.includes('anthropic') || url.hostname.includes('firebase') || url.hostname.includes('googleapis')) {
-    return;
-  }
+  if (
+    url.hostname.includes('anthropic') ||
+    url.hostname.includes('firebase') ||
+    url.hostname.includes('googleapis') ||
+    url.hostname.includes('generativelanguage')
+  ) return;
+
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
@@ -42,7 +48,8 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
         return res;
       }).catch(() => {
-        if (e.request.mode === 'navigate') return caches.match('/index.html');
+        if (e.request.mode === 'navigate')
+          return caches.match('/keto-tracker/index.html');
       });
     })
   );
