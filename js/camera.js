@@ -35,7 +35,7 @@ function renderAnalysisBar() {
     bar.innerHTML = `<span class="analysis-bar-spinner"></span><span>AI 分析中…</span><button class="analysis-bar-btn" id="btn-bar-goto">查看</button>`;
   } else if (s.status === 'done') {
     bar.className = 'analysis-bar done';
-    bar.innerHTML = `<span>✓ 分析完成</span><button class="analysis-bar-btn" id="btn-bar-goto">返回填寫</button><button class="analysis-bar-close" id="btn-bar-close">✕</button>`;
+    bar.innerHTML = `<span>✅ 分析完成</span><button class="analysis-bar-btn" id="btn-bar-goto">返回填寫</button><button class="analysis-bar-close" id="btn-bar-close">✕</button>`;
   } else if (s.status === 'error') {
     bar.className = 'analysis-bar error';
     bar.innerHTML = `<span>⚠ ${s.errorMsg}</span><button class="analysis-bar-btn" id="btn-bar-retry">重試</button><button class="analysis-bar-close" id="btn-bar-close">✕</button>`;
@@ -53,18 +53,37 @@ function renderAnalysisBar() {
   });
 }
 
-// Watch visibility — if page comes back from background and fetch died, show retry
+// ===== Background fetch detection =====
+// If iOS suspends JS and kills the fetch, the promise will reject.
+// But if the app returns to foreground and status is still 'running' after a
+// grace period, we treat it as a dead fetch and surface a retry prompt.
+let _bgCheckTimer = null;
+
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     const s = window.__ketoAnalysis;
     if (s.status === 'running') {
-      // Check if the AbortController is still alive after a grace period
-      setTimeout(() => {
+      // Give the promise 3 seconds to self-resolve/reject after returning to foreground.
+      // If it's still 'running' after that, iOS likely killed the fetch silently.
+      clearTimeout(_bgCheckTimer);
+      _bgCheckTimer = setTimeout(() => {
         if (window.__ketoAnalysis.status === 'running') {
-          // Still running after 2s — could be fine; do nothing.
-          // If fetch was killed by iOS, the promise will reject and status changes to error automatically.
+          window.__ketoAnalysis.status = 'error';
+          window.__ketoAnalysis.errorMsg = '後台中斷，請重試';
+          renderAnalysisBar();
+          // If record page is mounted, update its UI too
+          const analyzingSection = document.getElementById('analyzing-section');
+          const manualSection = document.getElementById('manual-section');
+          if (analyzingSection) analyzingSection.classList.add('hidden');
+          if (manualSection) manualSection.classList.remove('hidden');
+          showToast('後台中斷，請重試');
         }
-      }, 2000);
+      }, 3000);
+    }
+  } else {
+    // Going to background — record the time so we can assess on return
+    if (window.__ketoAnalysis.status === 'running') {
+      window.__ketoAnalysis._bgAt = Date.now();
     }
   }
 });
@@ -285,7 +304,14 @@ export function renderRecord(container) {
   fileGal.addEventListener('change', e => handleFile(e.target.files[0]));
   document.getElementById('btn-remove-img').addEventListener('click', resetToUpload);
   document.getElementById('btn-analyze').addEventListener('click', doAnalyze);
-  document.getElementById('btn-minimize')?.addEventListener('click', () => navigate('dashboard'));
+
+  // Minimize / collapse: hide the analyzing card, show the floating bar, navigate away
+  document.getElementById('btn-minimize')?.addEventListener('click', () => {
+    analyzingSection.classList.add('hidden');
+    renderAnalysisBar(); // bar is already running state — just ensure it's visible
+    navigate('dashboard');
+  });
+
   document.getElementById('btn-reanalyze').addEventListener('click', () => {
     resultSection.classList.add('hidden');
     window.__ketoAnalysis.status = 'idle';
@@ -344,25 +370,39 @@ export function renderRecord(container) {
     window.__ketoAnalysis.status = 'running';
     window.__ketoAnalysis.data = null;
     window.__ketoAnalysis.errorMsg = '';
+    window.__ketoAnalysis._bgAt = null;
     renderAnalysisBar();
 
     try {
       const result = await analyzeImage(currentImageBase64, currentMimeType);
+
+      // Clear any pending background check
+      clearTimeout(_bgCheckTimer);
+
+      // If background killed the fetch and we already flipped to error, ignore late resolve
+      if (window.__ketoAnalysis.status !== 'running') return;
+
       analysisData = result;
       window.__ketoAnalysis.status = 'done';
       window.__ketoAnalysis.data = result;
       renderAnalysisBar();
 
-      // If still on record page, show result
+      // If still on record page, show result inline
       analyzingSection.classList.add('hidden');
       renderResult(result);
       resultSection.classList.remove('hidden');
     } catch (err) {
+      clearTimeout(_bgCheckTimer);
+
+      // Already handled by visibilitychange — don't double-toast
+      if (window.__ketoAnalysis.status === 'error') return;
+
       let msg = '分析失敗，請重試';
       if (err.message === 'NO_API_KEY') msg = '請先設定 API Key';
-      else if (err.message === 'PARSE_ERROR') msg = '格式異常，請重試';
+      else if (err.message === 'PARSE_ERROR') msg = 'AI 回傳格式異常，請重試';
       else if (/timeout|time.?out|timedout/i.test(err.message)) msg = '分析逾時，請重試';
-      else if (/network|fetch/i.test(err.message)) msg = '網絡中斷，請重試';
+      else if (/network|fetch|failed to fetch/i.test(err.message)) msg = '網絡中斷，請重試';
+      else if (/AbortError/i.test(err.name)) msg = '後台中斷，請重試';
       window.__ketoAnalysis.status = 'error';
       window.__ketoAnalysis.errorMsg = msg;
       renderAnalysisBar();
