@@ -1,4 +1,4 @@
-import { initFirebase, onAuthChange, signInWithGoogle, signOutUser, getCurrentUser } from './firebase.js';
+import { initFirebase, onAuthChange, signInWithGoogle, signOutUser } from './firebase.js';
 import { renderRecord } from './camera.js';
 import { renderDashboard } from './dashboard.js';
 import { renderHistory } from './history.js';
@@ -30,10 +30,22 @@ if ('serviceWorker' in navigator) {
 
 // ===== Navigation =====
 registerPages({ record: renderRecord, dashboard: renderDashboard, history: renderHistory, settings: renderSettings });
-
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => navigate(btn.dataset.page));
 });
+
+// ===== Helpers =====
+function hideSplash() {
+  document.getElementById('splash-screen').classList.add('hidden');
+}
+function showApp() {
+  document.getElementById('main-content').classList.remove('hidden');
+  document.getElementById('bottom-nav').classList.remove('hidden');
+}
+function hideApp() {
+  document.getElementById('main-content').classList.add('hidden');
+  document.getElementById('bottom-nav').classList.add('hidden');
+}
 
 // ===== Auth UI =====
 function showAuthOverlay() {
@@ -41,10 +53,7 @@ function showAuthOverlay() {
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'auth-overlay';
-    overlay.style.cssText = `
-      position:fixed;inset:0;background:#0f1412;display:flex;flex-direction:column;
-      align-items:center;justify-content:center;z-index:9999;gap:24px;
-    `;
+    overlay.style.cssText = 'position:fixed;inset:0;background:#0f1412;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:24px;';
     overlay.innerHTML = `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="72" height="72">
         <rect width="192" height="192" rx="38" fill="#0f1412"/>
@@ -55,11 +64,7 @@ function showAuthOverlay() {
       </svg>
       <div style="color:#cdccca;font-size:1.25rem;font-weight:700;">酮食記</div>
       <div style="color:#797876;font-size:0.9rem;">登入以同步你的飲食記錄</div>
-      <button id="google-signin-btn" style="
-        display:flex;align-items:center;gap:12px;background:#fff;color:#3c4043;
-        border:none;border-radius:8px;padding:12px 24px;font-size:1rem;font-weight:600;
-        cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);
-      ">
+      <button id="google-signin-btn" style="display:flex;align-items:center;gap:12px;background:#fff;color:#3c4043;border:none;border-radius:8px;padding:12px 24px;font-size:1rem;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
         <svg width="20" height="20" viewBox="0 0 48 48">
           <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
           <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -72,12 +77,14 @@ function showAuthOverlay() {
     `;
     document.body.appendChild(overlay);
     document.getElementById('google-signin-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('google-signin-btn');
+      btn.textContent = '登入中...';
+      btn.disabled = true;
       try {
-        document.getElementById('google-signin-btn').textContent = '登入中...';
         await signInWithGoogle();
       } catch (e) {
-        document.getElementById('google-signin-btn').innerHTML = '登入失敗，請重試';
-        setTimeout(() => location.reload(), 2000);
+        btn.textContent = '登入失敗，請重試';
+        btn.disabled = false;
       }
     });
   }
@@ -91,37 +98,39 @@ function hideAuthOverlay() {
 
 // ===== Init =====
 async function init() {
+  // 安全保護：5秒內如果 Firebase 未回應，直接顯示登入畫面
+  const safetyTimer = setTimeout(() => {
+    hideSplash();
+    showAuthOverlay();
+  }, 5000);
+
   try {
-    const user = await initFirebase();
-    if (!user) {
-      document.getElementById('splash-screen').classList.add('hidden');
-      showAuthOverlay();
-    }
+    // 設定 auth state 監聽器（只登記一次）
     onAuthChange(user => {
+      clearTimeout(safetyTimer);
+      hideSplash();
       if (user) {
         hideAuthOverlay();
-        document.getElementById('splash-screen').classList.add('hidden');
-        document.getElementById('main-content').classList.remove('hidden');
-        document.getElementById('bottom-nav').classList.remove('hidden');
+        showApp();
         navigate('record');
       } else {
-        document.getElementById('main-content').classList.add('hidden');
-        document.getElementById('bottom-nav').classList.add('hidden');
+        hideApp();
         showAuthOverlay();
       }
     });
+
+    await initFirebase();
   } catch (e) {
+    clearTimeout(safetyTimer);
     console.warn('Firebase init failed, running offline:', e.message);
-    document.getElementById('splash-screen').classList.add('hidden');
-    document.getElementById('main-content').classList.remove('hidden');
-    document.getElementById('bottom-nav').classList.remove('hidden');
+    hideSplash();
+    showApp();
     navigate('record');
   }
 }
 
 init();
 
-// Export signOut for settings page
 window.ketoSignOut = async () => {
   await signOutUser();
 };

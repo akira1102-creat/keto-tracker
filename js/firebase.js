@@ -2,7 +2,6 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore, doc, getDoc, setDoc, collection, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
-// ===== Firebase Config (硬編碼) =====
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyCoAVgCDo1vh-YI3IWv7nm5nVav7hdqjoc",
   authDomain: "akira-project-508eb.firebaseapp.com",
@@ -14,49 +13,51 @@ const FIREBASE_CONFIG = {
 
 let db = null;
 let auth = null;
-let currentUser = null;
-let authStateListeners = [];
+let currentUser = undefined; // undefined = 未知, null = 未登入, object = 已登入
+const authListeners = [];
+let authInited = false;
+
+export function onAuthChange(fn) {
+  authListeners.push(fn);
+  // 如果已經有狀態，立即呼叫
+  if (currentUser !== undefined) fn(currentUser);
+}
 
 export async function initFirebase() {
+  if (authInited) return currentUser;
+  authInited = true;
+
   const app = initializeApp(FIREBASE_CONFIG);
   db = getFirestore(app);
   auth = getAuth(app);
 
+  // 監聽 auth 狀態，resolve 後繼續更新
+  onAuthStateChanged(auth, user => {
+    currentUser = user;
+    authListeners.forEach(fn => fn(user));
+  });
+
+  // 等待第一次 auth 狀態回傳（最多 8 秒）
   return new Promise(resolve => {
-    onAuthStateChanged(auth, user => {
-      currentUser = user;
-      authStateListeners.forEach(fn => fn(user));
+    const unsub = onAuthStateChanged(auth, user => {
+      unsub();
       resolve(user);
     });
+    setTimeout(() => resolve(null), 8000);
   });
-}
-
-export function onAuthChange(fn) {
-  authStateListeners.push(fn);
-  if (currentUser !== undefined) fn(currentUser);
 }
 
 export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
-  try {
-    const result = await signInWithPopup(auth, provider);
-    currentUser = result.user;
-    authStateListeners.forEach(fn => fn(currentUser));
-    return currentUser;
-  } catch (e) {
-    console.error('Google sign-in failed:', e);
-    throw e;
-  }
+  const result = await signInWithPopup(auth, provider);
+  return result.user;
 }
 
 export async function signOutUser() {
   await signOut(auth);
-  currentUser = null;
-  authStateListeners.forEach(fn => fn(null));
 }
 
 export function getCurrentUser() { return currentUser; }
-export function getDB() { return db; }
 export function isSignedIn() { return !!currentUser; }
 
 // ===== User Profile =====
@@ -64,11 +65,7 @@ export async function getUserProfile() {
   if (!db || !currentUser) return getLocalProfile();
   try {
     const snap = await getDoc(doc(db, 'users', currentUser.uid, 'data', 'profile'));
-    if (snap.exists()) {
-      const remote = snap.data();
-      saveLocalProfile(remote);
-      return remote;
-    }
+    if (snap.exists()) { saveLocalProfile(snap.data()); return snap.data(); }
     return getLocalProfile();
   } catch { return getLocalProfile(); }
 }
@@ -87,8 +84,7 @@ export async function getDailyLog(dateStr) {
   if (!db || !currentUser) return local;
   try {
     const snap = await getDoc(doc(db, 'users', currentUser.uid, 'daily_logs', dateStr));
-    if (snap.exists()) return snap.data();
-    return local;
+    return snap.exists() ? snap.data() : local;
   } catch { return local; }
 }
 
@@ -115,33 +111,20 @@ export async function getHistoryLogs(months = 3) {
   } catch { return local; }
 }
 
-// ===== Local Storage fallback =====
+// ===== Local Storage =====
 export function getLocalProfile() {
-  try {
-    const raw = localStorage.getItem('keto_profile');
-    return raw ? JSON.parse(raw) : defaultProfile();
-  } catch { return defaultProfile(); }
+  try { return JSON.parse(localStorage.getItem('keto_profile')) || defaultProfile(); }
+  catch { return defaultProfile(); }
 }
 function saveLocalProfile(p) {
   try { localStorage.setItem('keto_profile', JSON.stringify(p)); } catch {}
 }
 function defaultProfile() {
-  return {
-    daily_calorie_goal: 2000,
-    fat_pct_goal: 70,
-    protein_pct_goal: 25,
-    carb_pct_goal: 5,
-    carb_limit_g: 25,
-    height_cm: null,
-    weight_kg: null,
-  };
+  return { daily_calorie_goal: 2000, fat_pct_goal: 70, protein_pct_goal: 25, carb_pct_goal: 5, carb_limit_g: 25, height_cm: null, weight_kg: null };
 }
-
 export function getLocalLog(dateStr) {
-  try {
-    const raw = localStorage.getItem(`keto_log_${dateStr}`);
-    return raw ? JSON.parse(raw) : emptyLog(dateStr);
-  } catch { return emptyLog(dateStr); }
+  try { return JSON.parse(localStorage.getItem(`keto_log_${dateStr}`)) || emptyLog(dateStr); }
+  catch { return emptyLog(dateStr); }
 }
 function saveLocalLog(dateStr, data) {
   try { localStorage.setItem(`keto_log_${dateStr}`, JSON.stringify(data)); } catch {}
@@ -149,7 +132,6 @@ function saveLocalLog(dateStr, data) {
 function emptyLog(dateStr) {
   return { date: dateStr, total_calories: 0, total_fat_g: 0, total_protein_g: 0, total_carb_g: 0, keto_status: 'keto', meals: [] };
 }
-
 export function getLocalHistory() {
   const logs = [];
   try {
@@ -157,14 +139,14 @@ export function getLocalHistory() {
       const key = localStorage.key(i);
       if (key?.startsWith('keto_log_')) {
         const data = JSON.parse(localStorage.getItem(key));
-        if (data.meals?.length > 0) logs.push(data);
+        if (data?.meals?.length > 0) logs.push(data);
       }
     }
   } catch {}
   return logs.sort((a, b) => b.date.localeCompare(a.date));
 }
 
-// ===== Meal helpers =====
+// ===== Helpers =====
 export function calcDayTotals(meals) {
   return meals.reduce((acc, m) => {
     acc.total_calories += m.calories || 0;
@@ -174,29 +156,21 @@ export function calcDayTotals(meals) {
     return acc;
   }, { total_calories: 0, total_fat_g: 0, total_protein_g: 0, total_carb_g: 0 });
 }
-
 export function calcKetoStatus(totals, profile) {
-  const carbLimit = profile.carb_limit_g || 25;
-  const fatPct = totals.total_calories > 0
-    ? (totals.total_fat_g * 9 / totals.total_calories * 100) : 100;
+  const fatPct = totals.total_calories > 0 ? (totals.total_fat_g * 9 / totals.total_calories * 100) : 100;
   if (totals.total_carb_g > 50 || fatPct < 60) return 'risk';
-  if (totals.total_carb_g > carbLimit || fatPct < 65) return 'edge';
+  if (totals.total_carb_g > (profile.carb_limit_g || 25) || fatPct < 65) return 'edge';
   return 'keto';
 }
-
 export function getTodayStr() {
   return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Macau' });
 }
-
 export async function syncOfflineQueue() {
   try {
     const queue = JSON.parse(localStorage.getItem('keto_offline_queue') || '[]');
     if (!queue.length || !db || !currentUser) return;
-    for (const item of queue) {
-      await saveDailyLog(item.dateStr, item.logData);
-    }
+    for (const item of queue) await saveDailyLog(item.dateStr, item.logData);
     localStorage.removeItem('keto_offline_queue');
   } catch {}
 }
-
 window.addEventListener('online', syncOfflineQueue);
