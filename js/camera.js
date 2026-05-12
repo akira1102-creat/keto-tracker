@@ -5,11 +5,22 @@ import { navigate } from './router.js';
 const MAX_DIM = 1024;
 
 export function renderRecord(container) {
+  const todayStr = getTodayStr();
+
   container.innerHTML = `
   <div class="page">
     <div class="page-header">
       <span style="font-size:24px">📷</span>
       <h1>記錄飲食</h1>
+    </div>
+
+    <div class="card" style="margin-bottom:12px;padding:12px 14px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:16px">📅</span>
+        <label class="form-label" for="record-date" style="margin:0;font-weight:600">記錄日期</label>
+        <input type="date" id="record-date" class="form-input" value="${todayStr}" max="${todayStr}" style="flex:1;min-width:0">
+      </div>
+      <div id="date-hint" style="font-size:12px;color:var(--color-text-muted);margin-top:6px;margin-left:26px">📍 今日</div>
     </div>
 
     <div id="upload-section">
@@ -114,7 +125,7 @@ export function renderRecord(container) {
         <div class="card-title">手動輸入</div>
         <div class="form-group">
           <label class="form-label">食物名稱</label>
-          <input type="text" id="manual-name" class="form-input" placeholder="例：牛油果沙拉">
+          <input type="text" id="manual-name" class="form-input" placeholder="例：牧油果沙拉">
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -154,6 +165,25 @@ export function renderRecord(container) {
   const previewImg = document.getElementById('preview-img');
   const fileCam = document.getElementById('file-camera');
   const fileGal = document.getElementById('file-gallery');
+  const recordDateInput = document.getElementById('record-date');
+  const dateHint = document.getElementById('date-hint');
+
+  // 更新日期提示文字
+  function updateDateHint() {
+    const val = recordDateInput.value;
+    if (val === todayStr) {
+      dateHint.textContent = '📍 今日';
+      dateHint.style.color = 'var(--color-text-muted)';
+    } else {
+      dateHint.textContent = `↗️ 証入 ${val} 的記錄`;
+      dateHint.style.color = 'var(--color-warning)';
+    }
+  }
+  recordDateInput.addEventListener('change', updateDateHint);
+
+  function getSelectedDate() {
+    return recordDateInput.value || todayStr;
+  }
 
   document.getElementById('btn-camera').addEventListener('click', () => fileCam.click());
   document.getElementById('btn-gallery').addEventListener('click', () => fileGal.click());
@@ -200,7 +230,7 @@ export function renderRecord(container) {
   async function doAnalyze() {
     if (!currentImageBase64) return;
     const apiKey = localStorage.getItem('keto_claude_api_key');
-    if (!apiKey) { showToast('請先在設定頁面輸入 Anthropic API Key'); return; }
+    if (!apiKey) { showToast('請先在設定頁面輸入 Gemini API Key'); return; }
     const overlay = document.createElement('div');
     overlay.className = 'analyzing-overlay';
     overlay.innerHTML = `<div class="spinner"></div><p>AI 分析中，請稍候…</p>`;
@@ -259,6 +289,7 @@ export function renderRecord(container) {
   }
 
   async function saveMeal() {
+    const dateStr = getSelectedDate();
     const meal = {
       id: Date.now().toString(),
       timestamp: new Date().toISOString(),
@@ -272,12 +303,13 @@ export function renderRecord(container) {
       source: 'camera',
       notes: analysisData?.notes || '',
     };
-    persistMeal(meal);
+    persistMeal(meal, dateStr);
   }
 
   function saveManual() {
     const name = document.getElementById('manual-name').value.trim();
     if (!name) { showToast('請輸入食物名稱'); return; }
+    const dateStr = getSelectedDate();
     persistMeal({
       id: Date.now().toString(),
       timestamp: new Date().toISOString(),
@@ -287,11 +319,10 @@ export function renderRecord(container) {
       protein_g: Number(document.getElementById('manual-protein').value) || 0,
       carb_g: Number(document.getElementById('manual-carb').value) || 0,
       fiber_g: 0, image_base64: null, source: 'manual', notes: '',
-    });
+    }, dateStr);
   }
 
-  function persistMeal(meal) {
-    const dateStr = getTodayStr();
+  function persistMeal(meal, dateStr) {
     const log = getLocalLog(dateStr);
     log.meals = log.meals || [];
     log.meals.push(meal);
@@ -299,7 +330,8 @@ export function renderRecord(container) {
     const profile = getLocalProfile();
     Object.assign(log, totals, { date: dateStr, keto_status: calcKetoStatus(totals, profile) });
     saveLocalLog(dateStr, log);
-    showToast('✓ 餐點已儲存');
+    const isToday = dateStr === todayStr;
+    showToast(isToday ? '✓ 餐點已儲存' : `✓ 已証入 ${dateStr} 的記錄`);
     setTimeout(() => navigate('dashboard'), 800);
   }
 }
