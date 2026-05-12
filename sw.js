@@ -1,16 +1,17 @@
-const CACHE_VERSION = 'v2.1.4';
+const CACHE_VERSION = 'v2.1.5';
 const CACHE_NAME = `keto-tracker-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/keto-tracker/',
   '/keto-tracker/index.html',
   '/keto-tracker/css/style.css',
   '/keto-tracker/js/app.js',
+  '/keto-tracker/js/store.js',
   '/keto-tracker/js/camera.js',
   '/keto-tracker/js/claude.js',
-  '/keto-tracker/js/firebase.js',
   '/keto-tracker/js/dashboard.js',
   '/keto-tracker/js/history.js',
   '/keto-tracker/js/settings.js',
+  '/keto-tracker/js/router.js',
   '/keto-tracker/manifest.json',
 ];
 
@@ -42,8 +43,7 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
         return res;
       }).catch(() => {
-        if (e.request.mode === 'navigate')
-          return caches.match('/keto-tracker/index.html');
+        if (e.request.mode === 'navigate') return caches.match('/keto-tracker/index.html');
       });
     })
   );
