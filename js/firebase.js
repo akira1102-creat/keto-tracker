@@ -4,7 +4,8 @@ import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, sig
 
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyCoAVgCDo1vh-YI3IWv7nm5nVav7hdqjoc",
-  authDomain: "akira-project-508eb.firebaseapp.com",
+  // Use GitHub Pages as authDomain so signInWithRedirect doesn't bounce through firebaseapp.com
+  authDomain: "akira1102-creat.github.io",
   projectId: "akira-project-508eb",
   storageBucket: "akira-project-508eb.firebasestorage.app",
   messagingSenderId: "19932489246",
@@ -30,7 +31,6 @@ export async function initFirebase() {
     if (_authCallback) _authCallback(user);
   });
 
-  // Check redirect result first (handles return from Google sign-in redirect)
   try {
     const result = await getRedirectResult(auth);
     if (result?.user) {
@@ -52,9 +52,7 @@ export async function initFirebase() {
 
 export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
-  // signInWithRedirect works in PWA/iOS Safari; no popup blocker issues
   await signInWithRedirect(auth, provider);
-  // Page will reload after Google auth — control returns via getRedirectResult() in initFirebase()
 }
 
 export async function signOutUser() {
