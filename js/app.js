@@ -7,35 +7,46 @@ import { navigate, registerPages } from './router.js';
 // 取消 HTML 硬性 fallback timer
 if (window.__clearSplashTimer) window.__clearSplashTimer();
 
-// ===== 即刻顯示 App（本地模式） =====
-document.getElementById('splash-screen').classList.add('hidden');
-document.getElementById('main-content').classList.remove('hidden');
-document.getElementById('bottom-nav').classList.remove('hidden');
+function showApp() {
+  document.getElementById('splash-screen').classList.add('hidden');
+  document.getElementById('main-content').classList.remove('hidden');
+  document.getElementById('bottom-nav').classList.remove('hidden');
+}
 
-// ===== Navigation =====
-registerPages({ record: renderRecord, dashboard: renderDashboard, history: renderHistory, settings: renderSettings });
-document.querySelectorAll('.nav-btn').forEach(btn => {
-  btn.addEventListener('click', () => navigate(btn.dataset.page));
-});
-navigate('record');
+try {
+  // ===== 即刻顯示 App（本地模式） =====
+  showApp();
 
-// ===== PWA Install =====
-let deferredInstallPrompt = null;
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  deferredInstallPrompt = e;
-  document.getElementById('install-prompt').classList.remove('hidden');
-});
-document.getElementById('install-btn')?.addEventListener('click', async () => {
-  if (!deferredInstallPrompt) return;
-  deferredInstallPrompt.prompt();
-  const { outcome } = await deferredInstallPrompt.userChoice;
-  if (outcome === 'accepted') document.getElementById('install-prompt').classList.add('hidden');
-  deferredInstallPrompt = null;
-});
-document.getElementById('install-dismiss')?.addEventListener('click', () => {
-  document.getElementById('install-prompt').classList.add('hidden');
-});
+  // ===== Navigation =====
+  registerPages({ record: renderRecord, dashboard: renderDashboard, history: renderHistory, settings: renderSettings });
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => navigate(btn.dataset.page));
+  });
+  navigate('record');
+
+  // ===== PWA Install =====
+  let deferredInstallPrompt = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    document.getElementById('install-prompt').classList.remove('hidden');
+  });
+  document.getElementById('install-btn')?.addEventListener('click', async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    if (outcome === 'accepted') document.getElementById('install-prompt').classList.add('hidden');
+    deferredInstallPrompt = null;
+  });
+  document.getElementById('install-dismiss')?.addEventListener('click', () => {
+    document.getElementById('install-prompt').classList.add('hidden');
+  });
+
+} catch (err) {
+  // 萬一任何 JS 錯誤，都強制顯示主畫面，唔會卡住
+  console.error('[keto] app init error:', err);
+  showApp();
+}
 
 // ===== Service Worker =====
 if ('serviceWorker' in navigator) {

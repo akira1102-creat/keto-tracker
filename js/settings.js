@@ -1,4 +1,5 @@
 import { getLocalProfile, saveLocalProfile } from './store.js';
+import { getTodayStr } from './store.js';
 import { showToast } from './camera.js';
 
 export function renderSettings(container) {
@@ -14,9 +15,9 @@ export function renderSettings(container) {
       <div class="settings-section-title">AI 分析</div>
       <div class="card">
         <div class="form-group">
-          <label class="form-label">Anthropic API Key</label>
-          <input type="password" id="api-key-input" class="form-input" placeholder="sk-ant-..." value="${apiKey}">
-          <div class="form-hint">用於 AI 分析食物圖片，<a href="https://console.anthropic.com" target="_blank" style="color:var(--color-primary-light)">前往取得</a></div>
+          <label class="form-label">Gemini API Key</label>
+          <input type="password" id="api-key-input" class="form-input" placeholder="AIza..." value="${apiKey}">
+          <div class="form-hint">用於 AI 分析食物圖片，<a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--color-primary-light)">前往取得 Gemini API Key</a></div>
         </div>
         <button class="btn btn-primary" id="btn-save-api">儲存 API Key</button>
       </div>
@@ -110,7 +111,6 @@ export function renderSettings(container) {
     try {
       await window.ketoSignIn();
       showToast('✓ 已登入');
-      // re-render
       import('./settings.js').then(m => m.renderSettings(container));
     } catch {
       btn.textContent = '登入失敗，請重試';
@@ -126,8 +126,7 @@ export function renderSettings(container) {
 
   document.getElementById('btn-clear-today')?.addEventListener('click', () => {
     if (!confirm('確定清除今日所有記錄？')) return;
-    const { getTodayStr } = require ? null : null;
-    const dateStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Macau' });
+    const dateStr = getTodayStr();
     localStorage.removeItem(`keto_log_${dateStr}`);
     showToast('今日記錄已清除');
   });

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2.1.5';
+const CACHE_VERSION = 'v2.1.6';
 const CACHE_NAME = `keto-tracker-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/keto-tracker/',
