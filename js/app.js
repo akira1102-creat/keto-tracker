@@ -56,7 +56,7 @@ function showAuthOverlay() {
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'auth-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;background:#0f1412;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:24px;';
+    overlay.style.cssText = 'position:fixed;inset:0;background:#0f1412;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:24px;padding:24px;';
     overlay.innerHTML = `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="72" height="72">
         <rect width="192" height="192" rx="38" fill="#0f1412"/>
@@ -66,7 +66,7 @@ function showAuthOverlay() {
         <path d="M80 128 C80 128 88 118 96 120 C104 118 112 128 112 128 C112 128 104 138 96 136 C88 138 80 128 80 128Z" fill="#1a5c38" stroke="#4caf50" stroke-width="1.5"/>
       </svg>
       <div style="color:#cdccca;font-size:1.25rem;font-weight:700;">酮食記</div>
-      <div style="color:#797876;font-size:0.9rem;">登入以同步你的飲食記錄</div>
+      <div style="color:#797876;font-size:0.9rem;text-align:center;">登入以同步你的飲食記錄</div>
       <button id="google-signin-btn" style="display:flex;align-items:center;gap:12px;background:#fff;color:#3c4043;border:none;border-radius:8px;padding:12px 24px;font-size:1rem;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
         <svg width="20" height="20" viewBox="0 0 48 48">
           <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -102,6 +102,8 @@ function hideAuthOverlay() {
 // ===== Init =====
 async function init() {
   try {
+    // 先登記 callback，再初始化 Firebase
+    // onAuthChange 唔會即時觸發，等 initFirebase() 內部 listener 回傳先觸發
     onAuthChange(user => {
       hideSplash();
       if (user) {
@@ -113,7 +115,12 @@ async function init() {
         showAuthOverlay();
       }
     });
+
     await initFirebase();
+    // initFirebase resolve 後，onAuthStateChanged 必定已觸發過一次
+    // 如果 _authCallback 仍未被呼叫（例如 Firebase 完全無回應），強制隱藏 splash
+    hideSplash();
+
   } catch (e) {
     console.warn('Firebase init failed:', e.message);
     hideSplash();

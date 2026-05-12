@@ -13,34 +13,29 @@ const FIREBASE_CONFIG = {
 
 let db = null;
 let auth = null;
-let currentUser = undefined; // undefined = 未知, null = 未登入, object = 已登入
-const authListeners = [];
-let authInited = false;
+let currentUser = undefined;
+let _authCallback = null; // 只保留一個 callback
 
+// app.js 先呼叫此函數登記 callback，再呼叫 initFirebase()
 export function onAuthChange(fn) {
-  authListeners.push(fn);
-  // 如果已經有狀態，立即呼叫
-  if (currentUser !== undefined) fn(currentUser);
+  _authCallback = fn;
 }
 
 export async function initFirebase() {
-  if (authInited) return currentUser;
-  authInited = true;
-
   const app = initializeApp(FIREBASE_CONFIG);
   db = getFirestore(app);
   auth = getAuth(app);
 
-  // 監聽 auth 狀態，resolve 後繼續更新
+  // 只設一個 listener，永遠有效
   onAuthStateChanged(auth, user => {
     currentUser = user;
-    authListeners.forEach(fn => fn(user));
+    if (_authCallback) _authCallback(user);
   });
 
-  // 等待第一次 auth 狀態回傳（最多 8 秒）
+  // 等待第一次 auth 狀態（最多 8 秒），超時視為未登入
   return new Promise(resolve => {
     const unsub = onAuthStateChanged(auth, user => {
-      unsub();
+      unsub(); // 用完即棄，唔影響上面那個常駐 listener
       resolve(user);
     });
     setTimeout(() => resolve(null), 8000);
