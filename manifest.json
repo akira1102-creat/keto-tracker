@@ -1,0 +1,27 @@
+{
+  "name": "酮食記 — 生酮飲食追蹤",
+  "short_name": "酮食記",
+  "description": "生酮飲食宏量追蹤，拍照即分析",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1412",
+  "theme_color": "#1a5c38",
+  "orientation": "portrait",
+  "lang": "zh-TW",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["health", "fitness", "food"],
+  "screenshots": []
+}
