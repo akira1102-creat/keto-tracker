@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2.0.1';
+const CACHE_VERSION = 'v2.1.0';
 const CACHE_NAME = `keto-tracker-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/keto-tracker/',
@@ -36,7 +36,8 @@ self.addEventListener('fetch', e => {
     url.hostname.includes('anthropic') ||
     url.hostname.includes('firebase') ||
     url.hostname.includes('googleapis') ||
-    url.hostname.includes('generativelanguage')
+    url.hostname.includes('generativelanguage') ||
+    url.hostname.includes('gstatic')
   ) return;
 
   e.respondWith(

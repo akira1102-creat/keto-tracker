@@ -1,49 +1,75 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, orderBy, limit, getDocs, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+import { getFirestore, doc, getDoc, setDoc, collection, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+// ===== Firebase Config (硬編碼) =====
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCoAVgCDo1vh-YI3IWv7nm5nVav7hdqjoc",
+  authDomain: "akira-project-508eb.firebaseapp.com",
+  projectId: "akira-project-508eb",
+  storageBucket: "akira-project-508eb.firebasestorage.app",
+  messagingSenderId: "19932489246",
+  appId: "1:19932489246:web:46ad2fd86929eb4ba5700f"
+};
 
 let db = null;
 let auth = null;
 let currentUser = null;
+let authStateListeners = [];
 
 export async function initFirebase() {
-  const cfg = getFirebaseConfig();
-  if (!cfg) throw new Error('No Firebase config');
-  const app = initializeApp(cfg);
+  const app = initializeApp(FIREBASE_CONFIG);
   db = getFirestore(app);
   auth = getAuth(app);
-  await signInAnon();
+
+  return new Promise(resolve => {
+    onAuthStateChanged(auth, user => {
+      currentUser = user;
+      authStateListeners.forEach(fn => fn(user));
+      resolve(user);
+    });
+  });
 }
 
-async function signInAnon() {
-  return new Promise((resolve, reject) => {
-    onAuthStateChanged(auth, user => {
-      if (user) { currentUser = user; resolve(user); }
-    });
-    signInAnonymously(auth).catch(reject);
-  });
+export function onAuthChange(fn) {
+  authStateListeners.push(fn);
+  if (currentUser !== undefined) fn(currentUser);
+}
+
+export async function signInWithGoogle() {
+  const provider = new GoogleAuthProvider();
+  try {
+    const result = await signInWithPopup(auth, provider);
+    currentUser = result.user;
+    authStateListeners.forEach(fn => fn(currentUser));
+    return currentUser;
+  } catch (e) {
+    console.error('Google sign-in failed:', e);
+    throw e;
+  }
+}
+
+export async function signOutUser() {
+  await signOut(auth);
+  currentUser = null;
+  authStateListeners.forEach(fn => fn(null));
 }
 
 export function getCurrentUser() { return currentUser; }
 export function getDB() { return db; }
-
-export function getFirebaseConfig() {
-  try {
-    const raw = localStorage.getItem('keto_firebase_config');
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-export function setFirebaseConfig(cfg) {
-  localStorage.setItem('keto_firebase_config', JSON.stringify(cfg));
-}
+export function isSignedIn() { return !!currentUser; }
 
 // ===== User Profile =====
 export async function getUserProfile() {
   if (!db || !currentUser) return getLocalProfile();
   try {
     const snap = await getDoc(doc(db, 'users', currentUser.uid, 'data', 'profile'));
-    return snap.exists() ? snap.data() : getLocalProfile();
+    if (snap.exists()) {
+      const remote = snap.data();
+      saveLocalProfile(remote);
+      return remote;
+    }
+    return getLocalProfile();
   } catch { return getLocalProfile(); }
 }
 
@@ -84,7 +110,8 @@ export async function getHistoryLogs(months = 3) {
     const colRef = collection(db, 'users', currentUser.uid, 'daily_logs');
     const q = query(colRef, where('date', '>=', cutoffStr), orderBy('date', 'desc'), limit(100));
     const snap = await getDocs(q);
-    return snap.docs.map(d => d.data());
+    const remote = snap.docs.map(d => d.data());
+    return remote.length > 0 ? remote : local;
   } catch { return local; }
 }
 
@@ -96,7 +123,7 @@ export function getLocalProfile() {
   } catch { return defaultProfile(); }
 }
 function saveLocalProfile(p) {
-  localStorage.setItem('keto_profile', JSON.stringify(p));
+  try { localStorage.setItem('keto_profile', JSON.stringify(p)); } catch {}
 }
 function defaultProfile() {
   return {
@@ -117,7 +144,7 @@ export function getLocalLog(dateStr) {
   } catch { return emptyLog(dateStr); }
 }
 function saveLocalLog(dateStr, data) {
-  localStorage.setItem(`keto_log_${dateStr}`, JSON.stringify(data));
+  try { localStorage.setItem(`keto_log_${dateStr}`, JSON.stringify(data)); } catch {}
 }
 function emptyLog(dateStr) {
   return { date: dateStr, total_calories: 0, total_fat_g: 0, total_protein_g: 0, total_carb_g: 0, keto_status: 'keto', meals: [] };
@@ -125,15 +152,15 @@ function emptyLog(dateStr) {
 
 export function getLocalHistory() {
   const logs = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key?.startsWith('keto_log_')) {
-      try {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('keto_log_')) {
         const data = JSON.parse(localStorage.getItem(key));
         if (data.meals?.length > 0) logs.push(data);
-      } catch {}
+      }
     }
-  }
+  } catch {}
   return logs.sort((a, b) => b.date.localeCompare(a.date));
 }
 
@@ -161,16 +188,15 @@ export function getTodayStr() {
   return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Macau' });
 }
 
-// ===== Offline queue sync =====
 export async function syncOfflineQueue() {
-  const queue = JSON.parse(localStorage.getItem('keto_offline_queue') || '[]');
-  if (!queue.length || !db || !currentUser) return;
-  for (const item of queue) {
-    try {
+  try {
+    const queue = JSON.parse(localStorage.getItem('keto_offline_queue') || '[]');
+    if (!queue.length || !db || !currentUser) return;
+    for (const item of queue) {
       await saveDailyLog(item.dateStr, item.logData);
-    } catch {}
-  }
-  localStorage.removeItem('keto_offline_queue');
+    }
+    localStorage.removeItem('keto_offline_queue');
+  } catch {}
 }
 
 window.addEventListener('online', syncOfflineQueue);
