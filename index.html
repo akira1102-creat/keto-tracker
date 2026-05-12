@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a5c38">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="酮食記">
+  <title>酮食記 — 生酮飲食追蹤</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="splash-screen" class="splash">
+      <div class="splash-content">
+        <div class="splash-icon">&#x1F951;</div>
+        <h1>酮食記</h1>
+        <p>生酮飲食追蹤</p>
+        <div class="spinner"></div>
+      </div>
+    </div>
+    <main id="main-content" class="hidden"></main>
+    <nav id="bottom-nav" class="bottom-nav hidden">
+      <button class="nav-btn active" data-page="record"><span class="nav-icon">&#x1F4F7;</span><span class="nav-label">記錄</span></button>
+      <button class="nav-btn" data-page="dashboard"><span class="nav-icon">&#x1F4CA;</span><span class="nav-label">今日</span></button>
+      <button class="nav-btn" data-page="history"><span class="nav-icon">&#x1F4C5;</span><span class="nav-label">歷史</span></button>
+      <button class="nav-btn" data-page="settings"><span class="nav-icon">&#x2699;&#xFE0F;</span><span class="nav-label">設定</span></button>
+    </nav>
+  </div>
+  <div id="install-prompt" class="install-prompt hidden">
+    <span>加入主畫面，隨時快速記錄</span>
+    <button id="install-btn">安裝</button>
+    <button id="install-dismiss">✕</button>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
