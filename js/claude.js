@@ -15,8 +15,9 @@ const SYSTEM_PROMPT = `你是一位生酮飲食分析師。請分析這張圖片
 }
 如果是營養標籤圖片，請直接從標籤讀取數值。如果是食物相片，請根據外觀估算，並在 notes 標注為估算值。只回傳 JSON，不要其他文字。`;
 
-const MODEL_NAME = 'gemma-4-31b-it';
-const MAX_RETRIES = 4;
+const MODEL_NAME = 'gemini-3.1-flash-lite';
+const MAX_RETRIES = 5;
+const RETRYABLE_STATUS = [429, 500, 503, 504];
 
 export async function analyzeImage(base64Data, mimeType = 'image/jpeg') {
   const apiKey = localStorage.getItem('keto_claude_api_key');
@@ -45,12 +46,18 @@ export async function analyzeImage(base64Data, mimeType = 'image/jpeg') {
         }
       );
 
+      // 抽取 Retry-After header（429 有時會提供）
+      const retryAfterSec = parseInt(res.headers?.get('Retry-After') || '0', 10);
+
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        const msg = err.error?.message || `API 錯誤 ${res.status}`;
-        const retryable = [429, 500, 503, 504].includes(res.status);
-        if (retryable && attempt < MAX_RETRIES) {
-          await sleep(getBackoffMs(attempt));
+        const errBody = await res.json().catch(() => ({}));
+        const msg = errBody.error?.message || `API 錯誤 ${res.status}`;
+
+        if (RETRYABLE_STATUS.includes(res.status) && attempt < MAX_RETRIES) {
+          const waitMs = retryAfterSec > 0
+            ? retryAfterSec * 1000
+            : getBackoffMs(attempt);
+          await sleep(waitMs);
           continue;
         }
         throw new Error(msg);
@@ -61,20 +68,20 @@ export async function analyzeImage(base64Data, mimeType = 'image/jpeg') {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error('PARSE_ERROR');
 
-      const parsed = JSON.parse(jsonMatch[0]);
-      return normalizeAnalysis(parsed);
+      return normalizeAnalysis(JSON.parse(jsonMatch[0]));
 
     } catch (err) {
       lastError = err;
       const msg = String(err?.message || '');
-      const retryableMsg =
+      const isRetryableMsg =
         msg.includes('high demand') ||
         msg.includes('overloaded') ||
         msg.includes('UNAVAILABLE') ||
-        msg.includes('503') ||
-        msg.includes('429');
+        msg.includes('rate limit') ||
+        msg.includes('quota') ||
+        /\b(429|500|503|504)\b/.test(msg);
 
-      if (retryableMsg && attempt < MAX_RETRIES) {
+      if (isRetryableMsg && attempt < MAX_RETRIES) {
         await sleep(getBackoffMs(attempt));
         continue;
       }
@@ -82,13 +89,12 @@ export async function analyzeImage(base64Data, mimeType = 'image/jpeg') {
     }
   }
 
-  throw lastError || new Error('UNKNOWN_ERROR');
+  throw lastError || new Error('服務暫時無法使用，請稍後再試或手動輸入。');
 }
 
 function getBackoffMs(attempt) {
-  const base = 1200;
-  const jitter = Math.floor(Math.random() * 500);
-  return base * Math.pow(2, attempt - 1) + jitter;
+  // 1.5s, 3s, 6s, 12s, 24s + 隨機 jitter 0-800ms
+  return 1500 * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 800);
 }
 
 function sleep(ms) {
