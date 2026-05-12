@@ -2,7 +2,7 @@ import { getLocalProfile, saveLocalProfile } from './store.js';
 import { getTodayStr } from './store.js';
 import { showToast } from './camera.js';
 
-const APP_VERSION = 'v2.3.3';
+const APP_VERSION = 'v2.3.4';
 
 export function renderSettings(container) {
   const profile = getLocalProfile();
@@ -124,7 +124,7 @@ export function renderSettings(container) {
   document.getElementById('btn-signout')?.addEventListener('click', async () => {
     await window.ketoSignOut();
     showToast('已登出');
-    import('./settings.js').then(m => m.renderSettings(container));
+    renderSettings(container);
   });
 
   document.getElementById('btn-clear-today')?.addEventListener('click', () => {

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2.3.3';
+const CACHE_VERSION = 'v2.3.4';
 const CACHE_NAME = `keto-tracker-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/keto-tracker/',
@@ -50,7 +50,6 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-
   if (e.request.method !== 'GET') return;
   if (BYPASS_ORIGINS.some(d => url.hostname === d || url.hostname.endsWith('.' + d))) return;
   if (url.origin !== self.location.origin) return;

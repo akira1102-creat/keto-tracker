@@ -4,7 +4,6 @@ import { renderHistory } from './history.js';
 import { renderSettings } from './settings.js';
 import { navigate, registerPages } from './router.js';
 
-// 取消 HTML 硬性 fallback timer
 if (window.__clearSplashTimer) window.__clearSplashTimer();
 
 function showApp() {
@@ -24,7 +23,6 @@ try {
 
   navigate('record');
 
-  // Update nav badge for analysis state
   function updateNavBadge() {
     const s = window.__ketoAnalysis;
     const recordBtn = document.querySelector('.nav-btn[data-page="record"]');
@@ -51,7 +49,6 @@ try {
     }
   }
 
-  // Poll badge state every second
   setInterval(updateNavBadge, 1000);
 
   // ===== PWA Install =====
@@ -83,32 +80,40 @@ if ('serviceWorker' in navigator) {
 }
 
 // ===== Firebase =====
-// Always initialise Firebase on load:
-// 1. so auth is ready when user taps Sign In (signInWithRedirect needs auth != null)
-// 2. so getRedirectResult() runs after returning from Google OAuth redirect
 window.__ketoUser = null;
-let _firebaseReady = null; // cached init promise
+let _firebaseReady = null;
+
+function refreshSettingsIfVisible() {
+  const settingsEl = document.getElementById('page-settings');
+  if (settingsEl && !settingsEl.classList.contains('hidden')) {
+    renderSettings(settingsEl);
+  }
+}
 
 function ensureFirebase() {
   if (!_firebaseReady) {
     _firebaseReady = import('./firebase.js').then(({ initFirebase, onAuthChange }) => {
       onAuthChange(user => {
+        const prev = window.__ketoUser;
         window.__ketoUser = user || null;
+        // Re-render settings if auth state actually changed
+        if (!!prev !== !!user) refreshSettingsIfVisible();
       });
-      return initFirebase(); // resolves with user (or null) after getRedirectResult
+      return initFirebase();
     });
   }
   return _firebaseReady;
 }
 
-// Kick off silently in background — does NOT block app startup
 ensureFirebase().then(user => {
-  if (user) window.__ketoUser = user;
-}).catch(() => {}); // network-less environment: silently ignore
+  if (user) {
+    window.__ketoUser = user;
+    refreshSettingsIfVisible();
+  }
+}).catch(() => {});
 
 window.ketoSignIn = async () => {
   const { signInWithGoogle } = await ensureFirebase().then(() => import('./firebase.js'));
-  // signInWithGoogle() calls signInWithRedirect — navigates away, never resolves
   await signInWithGoogle();
 };
 
