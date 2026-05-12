@@ -1,19 +1,28 @@
-const SYSTEM_PROMPT = `你是一位生酮飲食分析師。請分析這張圖片中的食物或營養標籤，並以 JSON 格式回傳以下資訊：
+const SYSTEM_PROMPT = `你是一位生酮飲食分析師。請分析這張圖片中的食物或營養標籤。
+只回傳一個合法 JSON 物件，不要包含任何其他文字、說明或 markdown。
+
+JSON 格式如下（所有數字欄位必須為數字，不要是文字）：
 {
   "food_name": "食物名稱（繁體中文）",
-  "estimated_serving": "估計份量（克或毫升）",
-  "calories": 總熱量數字,
+  "estimated_serving": "份量說明",
+  "calories": 0,
   "macros": {
-    "fat_g": 脂肪克數數字,
-    "protein_g": 蛋白質克數數字,
-    "carb_g": 淨碳水化合物克數數字（已扣除膳食纖維）,
-    "fiber_g": 膳食纖維克數數字
+    "fat_g": 0,
+    "protein_g": 0,
+    "carb_g": 0,
+    "fiber_g": 0
   },
-  "keto_risk": "low 或 medium 或 high",
+  "keto_risk": "low",
   "notes": "備注（繁體中文）",
-  "confidence": "high 或 medium 或 low"
+  "confidence": "high"
 }
-如果是營養標籤圖片，請直接從標籤讀取數值。如果是食物相片，請根據外觀估算，並在 notes 標注為估算值。只回傳 JSON，不要其他文字。`;
+
+規則：
+- keto_risk 只能是 low / medium / high
+- confidence 只能是 high / medium / low
+- calories、fat_g、protein_g、carb_g、fiber_g 必須是純數字（不加單位）
+- carb_g 為淨碳水（已扣除膳食纖維）
+- 營養標籤圖片請直接讀數值；食物相片請估算並在 notes 說明為估算`;
 
 const MODEL_NAME = 'gemini-3.1-flash-lite';
 const MAX_RETRIES = 5;
@@ -38,42 +47,41 @@ export async function analyzeImage(base64Data, mimeType = 'image/jpeg') {
               role: 'user',
               parts: [
                 { inline_data: { mime_type: mimeType, data: base64Data } },
-                { text: '請分析這張圖片中的食物或營養標籤。' }
+                { text: '請分析這張圖片中的食物或營養標籤，回傳 JSON。' }
               ]
             }],
-            generationConfig: { maxOutputTokens: 1024, temperature: 0.2 }
+            generationConfig: {
+              maxOutputTokens: 1024,
+              temperature: 0.1,
+              responseMimeType: 'application/json'
+            }
           })
         }
       );
 
-      // 抽取 Retry-After header（429 有時會提供）
       const retryAfterSec = parseInt(res.headers?.get('Retry-After') || '0', 10);
 
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         const msg = errBody.error?.message || `API 錯誤 ${res.status}`;
-
         if (RETRYABLE_STATUS.includes(res.status) && attempt < MAX_RETRIES) {
-          const waitMs = retryAfterSec > 0
-            ? retryAfterSec * 1000
-            : getBackoffMs(attempt);
-          await sleep(waitMs);
+          await sleep(retryAfterSec > 0 ? retryAfterSec * 1000 : getBackoffMs(attempt));
           continue;
         }
         throw new Error(msg);
       }
 
       const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('PARSE_ERROR');
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const parsed = extractJSON(rawText);
+      if (!parsed) throw new Error('PARSE_ERROR');
 
-      return normalizeAnalysis(JSON.parse(jsonMatch[0]));
+      return normalizeAnalysis(parsed);
 
     } catch (err) {
       lastError = err;
       const msg = String(err?.message || '');
-      const isRetryableMsg =
+      const isRetryable =
         msg.includes('high demand') ||
         msg.includes('overloaded') ||
         msg.includes('UNAVAILABLE') ||
@@ -81,7 +89,7 @@ export async function analyzeImage(base64Data, mimeType = 'image/jpeg') {
         msg.includes('quota') ||
         /\b(429|500|503|504)\b/.test(msg);
 
-      if (isRetryableMsg && attempt < MAX_RETRIES) {
+      if (isRetryable && attempt < MAX_RETRIES) {
         await sleep(getBackoffMs(attempt));
         continue;
       }
@@ -92,8 +100,24 @@ export async function analyzeImage(base64Data, mimeType = 'image/jpeg') {
   throw lastError || new Error('服務暫時無法使用，請稍後再試或手動輸入。');
 }
 
+// 清洗並提取 JSON：支援 ```json``` 包裝、純 JSON、前後有雜字
+ function extractJSON(text) {
+  if (!text) return null;
+  // 移除 markdown code block
+  let clean = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+  // 取出第一個 { ... }
+  const match = clean.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[0]);
+  } catch {
+    // 嘗試修復：移除 trailing comma
+    const fixed = match[0].replace(/,\s*([}\]])/g, '$1');
+    try { return JSON.parse(fixed); } catch { return null; }
+  }
+}
+
 function getBackoffMs(attempt) {
-  // 1.5s, 3s, 6s, 12s, 24s + 隨機 jitter 0-800ms
   return 1500 * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 800);
 }
 
@@ -106,10 +130,10 @@ function normalizeAnalysis(raw) {
     food_name: raw.food_name || '未知食物',
     estimated_serving: raw.estimated_serving || '1 份',
     calories: Number(raw.calories) || 0,
-    fat_g: Number(raw.macros?.fat_g) || 0,
-    protein_g: Number(raw.macros?.protein_g) || 0,
-    carb_g: Number(raw.macros?.carb_g) || 0,
-    fiber_g: Number(raw.macros?.fiber_g) || 0,
+    fat_g: Number(raw.macros?.fat_g ?? raw.fat_g) || 0,
+    protein_g: Number(raw.macros?.protein_g ?? raw.protein_g) || 0,
+    carb_g: Number(raw.macros?.carb_g ?? raw.carb_g) || 0,
+    fiber_g: Number(raw.macros?.fiber_g ?? raw.fiber_g) || 0,
     keto_risk: raw.keto_risk || 'medium',
     notes: raw.notes || '',
     confidence: raw.confidence || 'medium',
