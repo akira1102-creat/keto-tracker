@@ -19,30 +19,24 @@ export async function analyzeImage(base64Data, mimeType = 'image/jpeg') {
   const apiKey = localStorage.getItem('keto_claude_api_key');
   if (!apiKey) throw new Error('NO_API_KEY');
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: [{
-        role: 'user',
-        content: [{
-          type: 'image',
-          source: { type: 'base64', media_type: mimeType, data: base64Data }
-        }, {
-          type: 'text',
-          text: '請分析這張圖片中的食物或營養標籤。'
-        }]
-      }]
-    })
-  });
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents: [{
+          role: 'user',
+          parts: [
+            { inline_data: { mime_type: mimeType, data: base64Data } },
+            { text: '請分析這張圖片中的食物或營養標籤。' }
+          ]
+        }],
+        generationConfig: { maxOutputTokens: 1024, temperature: 0.2 }
+      })
+    }
+  );
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -50,9 +44,8 @@ export async function analyzeImage(base64Data, mimeType = 'image/jpeg') {
   }
 
   const data = await res.json();
-  const text = data.content?.[0]?.text || '';
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-  // Extract JSON from response
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('PARSE_ERROR');
 
