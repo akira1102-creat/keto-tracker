@@ -3,6 +3,7 @@
 ## ⚠️ 必讀：每次修改後強制執行
 
 **每次對任何檔案作出修改並 commit 之前，必須先 bump `sw.js` 的 Cache 版本號。**
+**同時必須更新 `js/settings.js` 頂部的 `APP_VERSION` 常數，與 `sw.js` 版本保持一致。**
 
 ---
 
@@ -16,13 +17,12 @@ v<major>.<minor>.<patch>
 
 例：`v2.1.6` → 下次改動變成 `v2.1.7`
 
-### 位置
+### 位置（兩處必須同步）
 
-檔案：`sw.js`，第一行：
-
-```js
-const CACHE_VERSION = 'v2.1.7'; // ← 每次改動都要 +1 patch
-```
+| 檔案 | 位置 | 範例 |
+|------|------|------|
+| `sw.js` | 第一行 `CACHE_VERSION` | `const CACHE_VERSION = 'v2.3.0';` |
+| `js/settings.js` | 頂部 `APP_VERSION` | `const APP_VERSION = 'v2.3.0';` |
 
 ### Bump 規則
 
@@ -43,6 +43,7 @@ const CACHE_VERSION = 'v2.1.7'; // ← 每次改動都要 +1 patch
 每次 commit 前確認以下全部完成：
 
 - [ ] `sw.js` 第一行 `CACHE_VERSION` 已 bump
+- [ ] `js/settings.js` 頂部 `APP_VERSION` 已同步更新（與 sw.js 版本一致）
 - [ ] `sw.js` 的 `STATIC_ASSETS` 陣列包含所有新增的靜態檔案路徑
 - [ ] 所有新增的 `js/*.js`、`css/*.css`、新 HTML 頁面都已加入 `STATIC_ASSETS`
 
@@ -65,6 +66,7 @@ const STATIC_ASSETS = [
   '/keto-tracker/js/history.js',
   '/keto-tracker/js/settings.js',
   '/keto-tracker/js/router.js',
+  '/keto-tracker/js/firebase.js',
   '/keto-tracker/manifest.json',
   // ← 新增檔案加在這裡
 ];
@@ -123,10 +125,38 @@ keto-tracker/
 | `keto_log_YYYY-MM-DD` | 當日餐點記錄 |
 | `keto_claude_api_key` | Gemini API Key |
 
-### Firebase
+### Firebase / Google 登入
 
 - `firebase.js` 採用 **lazy import**，只在用戶主動登入時才載入
 - 絕對不可在 `app.js` 頂層 `import firebase.js`，否則會阻塞主載入
+- **Google 登入使用 `signInWithRedirect`（非 `signInWithPopup`）**
+  - iOS Safari PWA 模式會封鎖 popup，必須用 redirect 方式
+  - `signInWithRedirect()` 會立即跳頁，**不會 resolve**，不可用 `await` 等待結果
+  - 登入結果在 app 重新載入後由 `initFirebase()` 中的 `getRedirectResult()` 處理
+  - `settings.js` 的登入按鈕只需 trigger redirect，顯示「跳轉中...」即可，不加 try/catch 包住整個流程
+- `sw.js` 的 `BYPASS_ORIGINS` 必須包含所有 Google / Firebase 域名，確保 SW 不攔截 auth redirect
+
+### Service Worker BYPASS_ORIGINS
+
+以下 domain 必須在 `sw.js` 的 `BYPASS_ORIGINS` 中，確保 Google Auth redirect 不被 SW 攔截：
+
+```js
+const BYPASS_ORIGINS = [
+  'accounts.google.com',
+  'oauth2.googleapis.com',
+  'www.googleapis.com',
+  'apis.google.com',
+  'www.gstatic.com',
+  'firebaseapp.com',
+  'googleapis.com',
+  'firestore.googleapis.com',
+  'identitytoolkit.googleapis.com',
+  'securetoken.googleapis.com',
+  'api.fontshare.com',
+  'fonts.googleapis.com',
+  'fonts.gstatic.com',
+];
+```
 
 ---
 

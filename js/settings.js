@@ -2,7 +2,7 @@ import { getLocalProfile, saveLocalProfile } from './store.js';
 import { getTodayStr } from './store.js';
 import { showToast } from './camera.js';
 
-const APP_VERSION = 'v2.2.4';
+const APP_VERSION = 'v2.3.0';
 
 export function renderSettings(container) {
   const profile = getLocalProfile();
@@ -110,18 +110,20 @@ export function renderSettings(container) {
     showToast('✓ 目標已儲存');
   });
 
-  document.getElementById('btn-signin')?.addEventListener('click', async () => {
+  // signInWithRedirect does NOT resolve — it navigates away immediately.
+  // Just trigger it and show a loading state; result is handled in initFirebase() via getRedirectResult().
+  document.getElementById('btn-signin')?.addEventListener('click', () => {
     const btn = document.getElementById('btn-signin');
-    btn.textContent = '登入中...';
+    btn.innerHTML = '跳轉至 Google 登入中...';
     btn.disabled = true;
-    try {
-      await window.ketoSignIn();
-      showToast('✓ 已登入');
-      import('./settings.js').then(m => m.renderSettings(container));
-    } catch {
-      btn.textContent = '登入失敗，請重試';
-      btn.disabled = false;
-    }
+    // Small delay so user sees the state change before redirect
+    setTimeout(() => {
+      window.ketoSignIn().catch(err => {
+        console.error('SignIn redirect failed:', err);
+        btn.innerHTML = '登入失敗，請重試';
+        btn.disabled = false;
+      });
+    }, 100);
   });
 
   document.getElementById('btn-signout')?.addEventListener('click', async () => {
