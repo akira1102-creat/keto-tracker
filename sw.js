@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2.3.2';
+const CACHE_VERSION = 'v2.3.3';
 const CACHE_NAME = `keto-tracker-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/keto-tracker/',
@@ -54,9 +54,6 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   if (BYPASS_ORIGINS.some(d => url.hostname === d || url.hostname.endsWith('.' + d))) return;
   if (url.origin !== self.location.origin) return;
-
-  // Bypass auth handler path (used by signInWithRedirect when authDomain = GitHub Pages)
-  if (url.pathname.includes('/__/auth/')) return;
 
   e.respondWith(
     caches.match(e.request).then(cached => {

@@ -2,7 +2,7 @@ import { getLocalProfile, saveLocalProfile } from './store.js';
 import { getTodayStr } from './store.js';
 import { showToast } from './camera.js';
 
-const APP_VERSION = 'v2.3.2';
+const APP_VERSION = 'v2.3.3';
 
 export function renderSettings(container) {
   const profile = getLocalProfile();
@@ -112,7 +112,7 @@ export function renderSettings(container) {
 
   document.getElementById('btn-signin')?.addEventListener('click', () => {
     const btn = document.getElementById('btn-signin');
-    btn.innerHTML = '跳轉至 Google 登入中...';
+    btn.innerHTML = '登入中...';
     btn.disabled = true;
     window.ketoSignIn().catch(err => {
       console.error('SignIn failed:', err);

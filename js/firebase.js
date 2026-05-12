@@ -1,11 +1,10 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
 import { getFirestore, doc, getDoc, setDoc, collection, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
-import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyCoAVgCDo1vh-YI3IWv7nm5nVav7hdqjoc",
-  // Use GitHub Pages as authDomain so signInWithRedirect doesn't bounce through firebaseapp.com
-  authDomain: "akira1102-creat.github.io",
+  authDomain: "akira-project-508eb.firebaseapp.com",
   projectId: "akira-project-508eb",
   storageBucket: "akira-project-508eb.firebasestorage.app",
   messagingSenderId: "19932489246",
@@ -50,9 +49,24 @@ export async function initFirebase() {
   });
 }
 
+// Detect if running as PWA (standalone) or iOS Safari — both block popups
+function needsRedirect() {
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  return isStandalone || isIOS;
+}
+
 export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
-  await signInWithRedirect(auth, provider);
+  if (needsRedirect()) {
+    // iOS Safari / PWA: popup is blocked, must use redirect
+    await signInWithRedirect(auth, provider);
+  } else {
+    // Desktop / Android Chrome: popup works fine
+    const result = await signInWithPopup(auth, provider);
+    return result.user;
+  }
 }
 
 export async function signOutUser() {
