@@ -16,9 +16,7 @@ let auth = null;
 let currentUser = undefined;
 let _authCallback = null;
 
-export function onAuthChange(fn) {
-  _authCallback = fn;
-}
+export function onAuthChange(fn) { _authCallback = fn; }
 
 export async function initFirebase() {
   const app = initializeApp(FIREBASE_CONFIG);
@@ -49,10 +47,8 @@ export async function initFirebase() {
   });
 }
 
-// Detect if running as PWA (standalone) or iOS Safari — both block popups
 function needsRedirect() {
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-    || window.navigator.standalone === true;
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
   return isStandalone || isIOS;
 }
@@ -60,21 +56,24 @@ function needsRedirect() {
 export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
   if (needsRedirect()) {
-    // iOS Safari / PWA: popup is blocked, must use redirect
     await signInWithRedirect(auth, provider);
   } else {
-    // Desktop / Android Chrome: popup works fine
     const result = await signInWithPopup(auth, provider);
     return result.user;
   }
 }
 
-export async function signOutUser() {
-  await signOut(auth);
-}
-
+export async function signOutUser() { await signOut(auth); }
 export function getCurrentUser() { return currentUser; }
 export function isSignedIn() { return !!currentUser; }
+
+// ===== Sync status =====
+function saveSyncTime() {
+  try { localStorage.setItem('keto_last_sync', new Date().toISOString()); } catch {}
+}
+export function getLastSyncTime() {
+  try { return localStorage.getItem('keto_last_sync'); } catch { return null; }
+}
 
 // ===== User Profile =====
 export async function getUserProfile() {
@@ -91,40 +90,74 @@ export async function saveUserProfile(profile) {
   if (!db || !currentUser) return;
   try {
     await setDoc(doc(db, 'users', currentUser.uid, 'data', 'profile'), profile, { merge: true });
+    saveSyncTime();
   } catch (e) { console.warn('Profile save failed:', e); }
 }
 
 // ===== Daily Logs =====
 export async function getDailyLog(dateStr) {
-  const local = getLocalLog(dateStr);
-  if (!db || !currentUser) return local;
-  try {
-    const snap = await getDoc(doc(db, 'users', currentUser.uid, 'daily_logs', dateStr));
-    return snap.exists() ? snap.data() : local;
-  } catch { return local; }
+  // Always try Firestore first when logged in
+  if (db && currentUser) {
+    try {
+      const snap = await getDoc(doc(db, 'users', currentUser.uid, 'daily_logs', dateStr));
+      if (snap.exists()) {
+        saveLocalLog(dateStr, snap.data()); // update local cache
+        return snap.data();
+      }
+    } catch (e) { console.warn('getDailyLog Firestore error:', e); }
+  }
+  return getLocalLog(dateStr);
 }
 
 export async function saveDailyLog(dateStr, logData) {
   saveLocalLog(dateStr, logData);
-  if (!db || !currentUser) return;
+  if (!db || !currentUser) {
+    // Queue for later sync
+    try {
+      const q = JSON.parse(localStorage.getItem('keto_offline_queue') || '[]');
+      const idx = q.findIndex(i => i.dateStr === dateStr);
+      if (idx >= 0) q[idx] = { dateStr, logData }; else q.push({ dateStr, logData });
+      localStorage.setItem('keto_offline_queue', JSON.stringify(q));
+    } catch {}
+    return;
+  }
   try {
     await setDoc(doc(db, 'users', currentUser.uid, 'daily_logs', dateStr), logData, { merge: true });
+    saveSyncTime();
+    window.dispatchEvent(new CustomEvent('keto-synced'));
   } catch (e) { console.warn('Log save failed:', e); }
 }
 
 export async function getHistoryLogs(months = 3) {
-  const local = getLocalHistory();
-  if (!db || !currentUser) return local;
+  if (db && currentUser) {
+    try {
+      const cutoff = new Date();
+      cutoff.setMonth(cutoff.getMonth() - months);
+      const cutoffStr = cutoff.toISOString().split('T')[0];
+      const colRef = collection(db, 'users', currentUser.uid, 'daily_logs');
+      const q = query(colRef, where('date', '>=', cutoffStr), orderBy('date', 'desc'), limit(100));
+      const snap = await getDocs(q);
+      const remote = snap.docs.map(d => d.data());
+      if (remote.length > 0) return remote;
+    } catch (e) { console.warn('getHistoryLogs error:', e); }
+  }
+  return getLocalHistory();
+}
+
+// Upload all local logs to Firestore (run once after first login)
+export async function uploadLocalToFirestore() {
+  if (!db || !currentUser) return;
+  const logs = getLocalHistory();
+  if (!logs.length) return;
+  const batch = logs.map(log =>
+    setDoc(doc(db, 'users', currentUser.uid, 'daily_logs', log.date), log, { merge: true })
+  );
   try {
-    const cutoff = new Date();
-    cutoff.setMonth(cutoff.getMonth() - months);
-    const cutoffStr = cutoff.toISOString().split('T')[0];
-    const colRef = collection(db, 'users', currentUser.uid, 'daily_logs');
-    const q = query(colRef, where('date', '>=', cutoffStr), orderBy('date', 'desc'), limit(100));
-    const snap = await getDocs(q);
-    const remote = snap.docs.map(d => d.data());
-    return remote.length > 0 ? remote : local;
-  } catch { return local; }
+    await Promise.all(batch);
+    saveSyncTime();
+    window.dispatchEvent(new CustomEvent('keto-synced'));
+    console.log(`[keto] uploaded ${logs.length} local logs to Firestore`);
+  } catch (e) { console.warn('uploadLocalToFirestore error:', e); }
 }
 
 // ===== Local Storage =====

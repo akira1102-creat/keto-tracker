@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2.3.4';
+const CACHE_VERSION = 'v2.3.5';
 const CACHE_NAME = `keto-tracker-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/keto-tracker/',
@@ -15,45 +15,24 @@ const STATIC_ASSETS = [
   '/keto-tracker/js/firebase.js',
   '/keto-tracker/manifest.json',
 ];
-
 const BYPASS_ORIGINS = [
-  'accounts.google.com',
-  'oauth2.googleapis.com',
-  'www.googleapis.com',
-  'apis.google.com',
-  'www.gstatic.com',
-  'firebaseapp.com',
-  'googleapis.com',
-  'firestore.googleapis.com',
-  'identitytoolkit.googleapis.com',
-  'securetoken.googleapis.com',
-  'api.fontshare.com',
-  'fonts.googleapis.com',
-  'fonts.gstatic.com',
+  'accounts.google.com','oauth2.googleapis.com','www.googleapis.com',
+  'apis.google.com','www.gstatic.com','firebaseapp.com','googleapis.com',
+  'firestore.googleapis.com','identitytoolkit.googleapis.com',
+  'securetoken.googleapis.com','api.fontshare.com',
+  'fonts.googleapis.com','fonts.gstatic.com',
 ];
-
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(STATIC_ASSETS))
-      .then(() => self.skipWaiting())
-  );
+  e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS)).then(() => self.skipWaiting()));
 });
-
 self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
-
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET') return;
   if (BYPASS_ORIGINS.some(d => url.hostname === d || url.hostname.endsWith('.' + d))) return;
   if (url.origin !== self.location.origin) return;
-
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
