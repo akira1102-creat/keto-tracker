@@ -24,7 +24,7 @@ JSON 格式如下（所有數字欄位必須為數字，不要是文字）：
 - carb_g 為淨碳水（已扣除膳食纖維）
 - 營養標籤圖片請直接讀數值；食物相片請估算並在 notes 說明為估算`;
 
-const MODEL_NAME = 'gemini-3.1-flash-lite';
+const MODEL_NAME = 'gemma-4-26b-a4b-it';
 const MAX_RETRIES = 5;
 const RETRYABLE_STATUS = [429, 500, 503, 504];
 
@@ -100,18 +100,14 @@ export async function analyzeImage(base64Data, mimeType = 'image/jpeg') {
   throw lastError || new Error('服務暫時無法使用，請稍後再試或手動輸入。');
 }
 
-// 清洗並提取 JSON：支援 ```json``` 包裝、純 JSON、前後有雜字
- function extractJSON(text) {
+function extractJSON(text) {
   if (!text) return null;
-  // 移除 markdown code block
   let clean = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
-  // 取出第一個 { ... }
   const match = clean.match(/\{[\s\S]*\}/);
   if (!match) return null;
   try {
     return JSON.parse(match[0]);
   } catch {
-    // 嘗試修復：移除 trailing comma
     const fixed = match[0].replace(/,\s*([}\]])/g, '$1');
     try { return JSON.parse(fixed); } catch { return null; }
   }
