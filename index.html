@@ -9,7 +9,9 @@
   <meta name="apple-mobile-web-app-title" content="酮食記">
   <title>酮食記 — 生酮飲食追蹤</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icons/icon-192.svg">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="icons/favicon-96x96.png">
+  <link rel="icon" type="image/x-icon" href="icons/favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
@@ -19,13 +21,7 @@
   <div id="app">
     <div id="splash-screen" class="splash">
       <div class="splash-content">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="80" height="80" style="margin-bottom:12px">
-          <rect width="192" height="192" rx="38" fill="#0f1412"/>
-          <circle cx="96" cy="96" r="72" fill="none" stroke="#1a5c38" stroke-width="3" opacity="0.5"/>
-          <path d="M96 38 C96 38 118 62 118 82 C118 100 108 108 108 108 C108 90 96 84 88 72 C84 88 90 100 84 112 C76 104 72 94 72 82 C72 62 96 38 96 38Z" fill="#4caf50" opacity="0.95"/>
-          <path d="M96 58 C96 58 110 74 110 86 C110 96 104 102 104 102 C104 90 96 84 91 76 C89 86 93 94 89 103 C84 97 82 90 82 84 C82 70 96 58 96 58Z" fill="#d4a017" opacity="0.9"/>
-          <path d="M80 128 C80 128 88 118 96 120 C104 118 112 128 112 128 C112 128 104 138 96 136 C88 138 80 128 80 128Z" fill="#1a5c38" stroke="#4caf50" stroke-width="1.5"/>
-        </svg>
+        <img src="icons/android-chrome-192x192.png" width="80" height="80" alt="酮食記" style="margin-bottom:12px;border-radius:20px">
         <h1>酮食記</h1>
         <p>生酮飲食追蹤</p>
         <div class="spinner"></div>
@@ -66,11 +62,9 @@
       var splash = document.getElementById('splash-screen');
       if (splash && !splash.classList.contains('hidden')) {
         console.warn('[keto] splash timeout — forcing reload');
-        // 嘗試卸載 service worker 再重載
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.getRegistrations().then(function(regs) {
             regs.forEach(function(r) { r.unregister(); });
-            // 清除所有 cache
             caches.keys().then(function(keys) {
               return Promise.all(keys.map(function(k) { return caches.delete(k); }));
             }).then(function() {
@@ -83,7 +77,6 @@
       }
     }, 6000);
 
-    // app.js 載入後會呼叫此函數取消 timer
     window.__clearSplashTimer = function() {
       clearTimeout(window.__splashTimer);
     };
