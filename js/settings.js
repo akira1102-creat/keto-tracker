@@ -15,12 +15,15 @@ export async function renderSettings(container) {
       <div class="settings-section-title">AI 分析設定</div>
       <div class="card">
         <div class="form-group">
-          <label class="form-label">Anthropic API Key</label>
-          <input type="password" id="s-api-key" class="form-input" value="${apiKey}" placeholder="sk-ant-...">
-          <div class="form-hint">儲存於本機，不會上傳至伺服器</div>
+          <label class="form-label">Google Gemini API Key</label>
+          <input type="password" id="s-api-key" class="form-input" value="${apiKey}" placeholder="AIza...">
+          <div class="form-hint">
+            免費申請：<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style="color:var(--color-primary)">aistudio.google.com/apikey</a>
+            ｜儲存於本機，不會上傳至伺服器
+          </div>
         </div>
         <div class="api-key-display ${apiKey ? 'set' : ''}" id="api-key-status">
-          ${apiKey ? '✓ 已設定 API Key' : '尚未設定 API Key'}
+          ${apiKey ? '✓ 已設定 Gemini API Key' : '尚未設定 API Key'}
         </div>
       </div>
     </div>
@@ -125,7 +128,7 @@ export async function renderSettings(container) {
     const apiKeyVal = document.getElementById('s-api-key').value.trim();
     if (apiKeyVal) {
       localStorage.setItem('keto_claude_api_key', apiKeyVal);
-      document.getElementById('api-key-status').textContent = '✓ 已設定 API Key';
+      document.getElementById('api-key-status').textContent = '✓ 已設定 Gemini API Key';
       document.getElementById('api-key-status').classList.add('set');
     }
 
