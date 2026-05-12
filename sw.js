@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2.1.3';
+const CACHE_VERSION = 'v2.1.4';
 const CACHE_NAME = `keto-tracker-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/keto-tracker/',
@@ -32,9 +32,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  // 只 cache 同域名請求，外部 Firebase/Google/CDN 全部直接放行
   if (url.origin !== self.location.origin) return;
-
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
