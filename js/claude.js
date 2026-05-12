@@ -1,28 +1,27 @@
 const SYSTEM_PROMPT = `你是一位生酮飲食分析師。請分析這張圖片中的食物或營養標籤。
-只回傳一個合法 JSON 物件，不要包含任何其他文字、說明或 markdown。
+只回傳一個合法 JSON 物件，不要包含任何其他文字、說明、markdown 或 code block。
 
 JSON 格式如下（所有數字欄位必須為數字，不要是文字）：
 {
   "food_name": "食物名稱（繁體中文）",
   "estimated_serving": "份量說明",
   "calories": 0,
-  "macros": {
-    "fat_g": 0,
-    "protein_g": 0,
-    "carb_g": 0,
-    "fiber_g": 0
-  },
+  "fat_g": 0,
+  "protein_g": 0,
+  "carb_g": 0,
+  "fiber_g": 0,
   "keto_risk": "low",
-  "notes": "備注（繁體中文）",
-  "confidence": "high"
+  "confidence": "high",
+  "notes": "備註（繁體中文）"
 }
 
 規則：
+- 必須輸出完整 JSON，不能有前言或結語
 - keto_risk 只能是 low / medium / high
 - confidence 只能是 high / medium / low
-- calories、fat_g、protein_g、carb_g、fiber_g 必須是純數字（不加單位）
+- calories、fat_g、protein_g、carb_g、fiber_g 必須是純數字
 - carb_g 為淨碳水（已扣除膳食纖維）
-- 營養標籤圖片請直接讀數值；食物相片請估算並在 notes 說明為估算`;
+- 營養標籤圖片請直接讀數值；食物相片請估算並在 notes 註明為估算`;
 
 const MODEL_NAME = 'gemma-4-26b-a4b-it';
 const MAX_RETRIES = 5;
@@ -52,8 +51,7 @@ export async function analyzeImage(base64Data, mimeType = 'image/jpeg') {
             }],
             generationConfig: {
               maxOutputTokens: 1024,
-              temperature: 0.1,
-              responseMimeType: 'application/json'
+              temperature: 0.1
             }
           })
         }
@@ -102,14 +100,26 @@ export async function analyzeImage(base64Data, mimeType = 'image/jpeg') {
 
 function extractJSON(text) {
   if (!text) return null;
-  let clean = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
-  const match = clean.match(/\{[\s\S]*\}/);
-  if (!match) return null;
+
+  const clean = text
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim();
+
+  const start = clean.indexOf('{');
+  const end = clean.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) return null;
+
+  const jsonText = clean.slice(start, end + 1);
+
   try {
-    return JSON.parse(match[0]);
+    return JSON.parse(jsonText);
   } catch {
-    const fixed = match[0].replace(/,\s*([}\]])/g, '$1');
-    try { return JSON.parse(fixed); } catch { return null; }
+    try {
+      return JSON.parse(jsonText.replace(/,\s*([}\]])/g, '$1'));
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -126,10 +136,10 @@ function normalizeAnalysis(raw) {
     food_name: raw.food_name || '未知食物',
     estimated_serving: raw.estimated_serving || '1 份',
     calories: Number(raw.calories) || 0,
-    fat_g: Number(raw.macros?.fat_g ?? raw.fat_g) || 0,
-    protein_g: Number(raw.macros?.protein_g ?? raw.protein_g) || 0,
-    carb_g: Number(raw.macros?.carb_g ?? raw.carb_g) || 0,
-    fiber_g: Number(raw.macros?.fiber_g ?? raw.fiber_g) || 0,
+    fat_g: Number(raw.fat_g ?? raw.macros?.fat_g) || 0,
+    protein_g: Number(raw.protein_g ?? raw.macros?.protein_g) || 0,
+    carb_g: Number(raw.carb_g ?? raw.macros?.carb_g) || 0,
+    fiber_g: Number(raw.fiber_g ?? raw.macros?.fiber_g) || 0,
     keto_risk: raw.keto_risk || 'medium',
     notes: raw.notes || '',
     confidence: raw.confidence || 'medium',

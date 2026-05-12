@@ -2,7 +2,7 @@ import { getLocalProfile, saveLocalProfile } from './store.js';
 import { getTodayStr } from './store.js';
 import { showToast } from './camera.js';
 
-const APP_VERSION = 'v2.2.2';
+const APP_VERSION = 'v2.2.3';
 
 export function renderSettings(container) {
   const profile = getLocalProfile();
@@ -95,7 +95,7 @@ export function renderSettings(container) {
 
   document.getElementById('btn-save-api').addEventListener('click', () => {
     const key = document.getElementById('api-key-input').value.trim();
-    if (key) { localStorage.setItem('keto_claude_api_key', key); showToast('\u2713 API Key 已儲存'); }
+    if (key) { localStorage.setItem('keto_claude_api_key', key); showToast('✓ API Key 已儲存'); }
     else { localStorage.removeItem('keto_claude_api_key'); showToast('API Key 已清除'); }
   });
 
@@ -107,7 +107,7 @@ export function renderSettings(container) {
     p.carb_pct_goal = Number(document.getElementById('s-carb-pct').value) || 5;
     p.carb_limit_g = Number(document.getElementById('s-carb').value) || 25;
     saveLocalProfile(p);
-    showToast('\u2713 目標已儲存');
+    showToast('✓ 目標已儲存');
   });
 
   document.getElementById('btn-signin')?.addEventListener('click', async () => {
@@ -116,7 +116,7 @@ export function renderSettings(container) {
     btn.disabled = true;
     try {
       await window.ketoSignIn();
-      showToast('\u2713 已登入');
+      showToast('✓ 已登入');
       import('./settings.js').then(m => m.renderSettings(container));
     } catch {
       btn.textContent = '登入失敗，請重試';
