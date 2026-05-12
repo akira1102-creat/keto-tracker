@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
 import { getFirestore, doc, getDoc, setDoc, collection, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyCoAVgCDo1vh-YI3IWv7nm5nVav7hdqjoc",
@@ -14,9 +14,8 @@ const FIREBASE_CONFIG = {
 let db = null;
 let auth = null;
 let currentUser = undefined;
-let _authCallback = null; // 只保留一個 callback
+let _authCallback = null;
 
-// app.js 先呼叫此函數登記 callback，再呼叫 initFirebase()
 export function onAuthChange(fn) {
   _authCallback = fn;
 }
@@ -26,16 +25,25 @@ export async function initFirebase() {
   db = getFirestore(app);
   auth = getAuth(app);
 
-  // 只設一個 listener，永遠有效
   onAuthStateChanged(auth, user => {
     currentUser = user;
     if (_authCallback) _authCallback(user);
   });
 
-  // 等待第一次 auth 狀態（最多 8 秒），超時視為未登入
+  // Check redirect result first (handles return from Google sign-in redirect)
+  try {
+    const result = await getRedirectResult(auth);
+    if (result?.user) {
+      currentUser = result.user;
+      if (_authCallback) _authCallback(result.user);
+    }
+  } catch (e) {
+    console.warn('getRedirectResult error:', e.code, e.message);
+  }
+
   return new Promise(resolve => {
     const unsub = onAuthStateChanged(auth, user => {
-      unsub(); // 用完即棄，唔影響上面那個常駐 listener
+      unsub();
       resolve(user);
     });
     setTimeout(() => resolve(null), 8000);
@@ -44,8 +52,9 @@ export async function initFirebase() {
 
 export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
-  const result = await signInWithPopup(auth, provider);
-  return result.user;
+  // signInWithRedirect works in PWA/iOS Safari; no popup blocker issues
+  await signInWithRedirect(auth, provider);
+  // Page will reload after Google auth — control returns via getRedirectResult() in initFirebase()
 }
 
 export async function signOutUser() {
