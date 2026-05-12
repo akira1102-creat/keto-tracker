@@ -7,12 +7,16 @@ const MAX_DIM = 1024;
 export function renderRecord(container) {
   container.innerHTML = `
   <div class="page">
-    <div class="page-header"><span style="font-size:24px">📷</span><h1>記錄飲食</h1></div>
+    <div class="page-header">
+      <span style="font-size:24px">📷</span>
+      <h1>記錄飲食</h1>
+    </div>
+
     <div id="upload-section">
       <div class="upload-zone" id="upload-zone">
         <div class="upload-icon">🥗</div>
         <div class="upload-title">拍攝或選擇食物圖片</div>
-        <div class="upload-sub">支援食物相片 &amp; 營養標籤</div>
+        <div class="upload-sub">支援食物相片 & 營養標籤</div>
         <div class="upload-actions">
           <button class="btn btn-primary" id="btn-camera">📷 拍照</button>
           <button class="btn btn-outline" id="btn-gallery">🖼️ 相簿</button>
@@ -21,6 +25,7 @@ export function renderRecord(container) {
       <input type="file" id="file-camera" accept="image/*" capture="environment" style="display:none">
       <input type="file" id="file-gallery" accept="image/*" style="display:none">
     </div>
+
     <div id="preview-section" class="hidden">
       <div class="image-preview">
         <img id="preview-img" src="" alt="食物圖片">
@@ -28,6 +33,7 @@ export function renderRecord(container) {
       </div>
       <button class="btn btn-primary" id="btn-analyze">🔍 開始分析</button>
     </div>
+
     <div id="result-section" class="hidden">
       <div class="result-card">
         <div class="result-header">
@@ -39,54 +45,107 @@ export function renderRecord(container) {
         </div>
         <div class="result-body">
           <div id="result-risk-badge" class="keto-risk-badge"></div>
+
           <div class="macro-grid">
-            <div class="macro-item"><div class="macro-label">熱量</div><div><span class="macro-value calorie" id="r-calories">0</span><span class="macro-unit"> kcal</span></div></div>
-            <div class="macro-item"><div class="macro-label">脂肪</div><div><span class="macro-value fat" id="r-fat">0</span><span class="macro-unit"> g</span></div></div>
-            <div class="macro-item"><div class="macro-label">蛋白質</div><div><span class="macro-value protein" id="r-protein">0</span><span class="macro-unit"> g</span></div></div>
-            <div class="macro-item"><div class="macro-label">淨碳水</div><div><span class="macro-value carb" id="r-carb">0</span><span class="macro-unit"> g</span></div></div>
+            <div class="macro-item">
+              <div class="macro-label">熱量</div>
+              <div><span class="macro-value calorie" id="r-calories">0</span><span class="macro-unit"> kcal</span></div>
+            </div>
+            <div class="macro-item">
+              <div class="macro-label">脂肪</div>
+              <div><span class="macro-value fat" id="r-fat">0</span><span class="macro-unit"> g</span></div>
+            </div>
+            <div class="macro-item">
+              <div class="macro-label">蛋白質</div>
+              <div><span class="macro-value protein" id="r-protein">0</span><span class="macro-unit"> g</span></div>
+            </div>
+            <div class="macro-item">
+              <div class="macro-label">淨碳水</div>
+              <div><span class="macro-value carb" id="r-carb">0</span><span class="macro-unit"> g</span></div>
+            </div>
           </div>
+
           <div id="result-notes" class="result-notes hidden"></div>
+
           <div class="serving-adjuster">
             <label for="serving-multiplier">實際份量</label>
             <input type="number" id="serving-multiplier" class="form-input" value="1" min="0.1" max="10" step="0.1" style="max-width:80px">
             <span>份（系統自動換算）</span>
           </div>
+
           <div class="divider"></div>
           <div class="card-title">微調數值（可選）</div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">食物名稱</label><input type="text" id="edit-name" class="form-input"></div>
-            <div class="form-group"><label class="form-label">熱量 (kcal)</label><input type="number" id="edit-calories" class="form-input" min="0"></div>
+            <div class="form-group">
+              <label class="form-label">食物名稱</label>
+              <input type="text" id="edit-name" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">熱量 (kcal)</label>
+              <input type="number" id="edit-calories" class="form-input" min="0">
+            </div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">脂肪 (g)</label><input type="number" id="edit-fat" class="form-input" min="0" step="0.1"></div>
-            <div class="form-group"><label class="form-label">蛋白質 (g)</label><input type="number" id="edit-protein" class="form-input" min="0" step="0.1"></div>
+            <div class="form-group">
+              <label class="form-label">脂肪 (g)</label>
+              <input type="number" id="edit-fat" class="form-input" min="0" step="0.1">
+            </div>
+            <div class="form-group">
+              <label class="form-label">蛋白質 (g)</label>
+              <input type="number" id="edit-protein" class="form-input" min="0" step="0.1">
+            </div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">淨碳水 (g)</label><input type="number" id="edit-carb" class="form-input" min="0" step="0.1"></div>
-            <div class="form-group"><label class="form-label">膳食纖維 (g)</label><input type="number" id="edit-fiber" class="form-input" min="0" step="0.1"></div>
+            <div class="form-group">
+              <label class="form-label">淨碳水 (g)</label>
+              <input type="number" id="edit-carb" class="form-input" min="0" step="0.1">
+            </div>
+            <div class="form-group">
+              <label class="form-label">膳食纖維 (g)</label>
+              <input type="number" id="edit-fiber" class="form-input" min="0" step="0.1">
+            </div>
           </div>
         </div>
       </div>
+
       <div style="display:flex;gap:10px;margin-top:12px">
         <button class="btn btn-outline" id="btn-reanalyze">重新分析</button>
         <button class="btn btn-primary" id="btn-save-meal">✓ 儲存餐點</button>
       </div>
     </div>
+
+    <!-- Manual entry fallback -->
     <div id="manual-section" class="hidden">
       <div class="card">
         <div class="card-title">手動輸入</div>
-        <div class="form-group"><label class="form-label">食物名稱</label><input type="text" id="manual-name" class="form-input" placeholder="例：牛油果沙拉"></div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">熱量 (kcal)</label><input type="number" id="manual-calories" class="form-input" min="0" placeholder="0"></div>
-          <div class="form-group"><label class="form-label">脂肪 (g)</label><input type="number" id="manual-fat" class="form-input" min="0" step="0.1" placeholder="0"></div>
+        <div class="form-group">
+          <label class="form-label">食物名稱</label>
+          <input type="text" id="manual-name" class="form-input" placeholder="例：牛油果沙拉">
         </div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">蛋白質 (g)</label><input type="number" id="manual-protein" class="form-input" min="0" step="0.1" placeholder="0"></div>
-          <div class="form-group"><label class="form-label">淨碳水 (g)</label><input type="number" id="manual-carb" class="form-input" min="0" step="0.1" placeholder="0"></div>
+          <div class="form-group">
+            <label class="form-label">熱量 (kcal)</label>
+            <input type="number" id="manual-calories" class="form-input" min="0" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">脂肪 (g)</label>
+            <input type="number" id="manual-fat" class="form-input" min="0" step="0.1" placeholder="0">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">蛋白質 (g)</label>
+            <input type="number" id="manual-protein" class="form-input" min="0" step="0.1" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">淨碳水 (g)</label>
+            <input type="number" id="manual-carb" class="form-input" min="0" step="0.1" placeholder="0">
+          </div>
         </div>
         <button class="btn btn-primary mt-12" id="btn-save-manual">✓ 儲存</button>
       </div>
     </div>
+
     <button class="btn btn-outline mt-12" id="btn-manual-toggle" style="font-size:13px">✍️ 手動輸入</button>
   </div>`;
 
@@ -106,18 +165,35 @@ export function renderRecord(container) {
   document.getElementById('btn-gallery').addEventListener('click', () => fileGal.click());
   fileCam.addEventListener('change', e => handleFile(e.target.files[0]));
   fileGal.addEventListener('change', e => handleFile(e.target.files[0]));
+
   document.getElementById('btn-remove-img').addEventListener('click', resetToUpload);
   document.getElementById('btn-analyze').addEventListener('click', doAnalyze);
-  document.getElementById('btn-reanalyze').addEventListener('click', () => { resultSection.classList.add('hidden'); previewSection.classList.remove('hidden'); });
+  document.getElementById('btn-reanalyze').addEventListener('click', () => {
+    resultSection.classList.add('hidden');
+    previewSection.classList.remove('hidden');
+  });
   document.getElementById('btn-save-meal').addEventListener('click', saveMeal);
   document.getElementById('btn-save-manual').addEventListener('click', saveManual);
-  document.getElementById('btn-manual-toggle').addEventListener('click', () => { manualSection.classList.toggle('hidden'); });
-  document.getElementById('serving-multiplier').addEventListener('input', updateServing);
+  document.getElementById('btn-manual-toggle').addEventListener('click', () => {
+    manualSection.classList.toggle('hidden');
+  });
 
+  // Serving multiplier updates display
+  document.getElementById('serving-multiplier').addEventListener('input', updateServing);
+  // Edit inputs sync
+  ['edit-calories','edit-fat','edit-protein','edit-carb'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => {});
+  });
+
+  // Drag & drop on upload zone
   const zone = document.getElementById('upload-zone');
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
   zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); const file = e.dataTransfer.files[0]; if (file?.type.startsWith('image/')) handleFile(file); });
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file?.type.startsWith('image/')) handleFile(file);
+  });
 
   async function handleFile(file) {
     if (!file) return;
@@ -131,21 +207,29 @@ export function renderRecord(container) {
   }
 
   function resetToUpload() {
-    currentImageBase64 = null; analysisData = null; previewImg.src = '';
+    currentImageBase64 = null;
+    analysisData = null;
+    previewImg.src = '';
     uploadSection.classList.remove('hidden');
     previewSection.classList.add('hidden');
     resultSection.classList.add('hidden');
-    fileCam.value = ''; fileGal.value = '';
+    fileCam.value = '';
+    fileGal.value = '';
   }
 
   async function doAnalyze() {
     if (!currentImageBase64) return;
     const apiKey = localStorage.getItem('keto_claude_api_key');
-    if (!apiKey) { showToast('請先在設定頁面輸入 Anthropic API Key'); return; }
+    if (!apiKey) {
+      showToast('請先在設定頁面輸入 Anthropic API Key');
+      return;
+    }
+
     const overlay = document.createElement('div');
     overlay.className = 'analyzing-overlay';
     overlay.innerHTML = `<div class="spinner"></div><p>AI 分析中，請稍候…</p>`;
     document.getElementById('app').appendChild(overlay);
+
     try {
       analysisData = await analyzeImage(currentImageBase64, currentMimeType);
       previewSection.classList.add('hidden');
@@ -153,11 +237,17 @@ export function renderRecord(container) {
       resultSection.classList.remove('hidden');
     } catch (err) {
       overlay.remove();
-      if (err.message === 'NO_API_KEY') showToast('請先在設定頁面輸入 API Key');
-      else if (err.message === 'PARSE_ERROR') showToast('分析結果格式異常，請重試或手動輸入');
-      else showToast(`分析失敗：${err.message}`);
+      if (err.message === 'NO_API_KEY') {
+        showToast('請先在設定頁面輸入 API Key');
+      } else if (err.message === 'PARSE_ERROR') {
+        showToast('分析結果格式異常，請重試或手動輸入');
+      } else {
+        showToast(`分析失敗：${err.message}`);
+      }
       manualSection.classList.remove('hidden');
-    } finally { overlay.remove(); }
+    } finally {
+      overlay.remove();
+    }
   }
 
   function renderResult(data) {
@@ -165,16 +255,24 @@ export function renderRecord(container) {
     document.getElementById('result-serving').textContent = data.estimated_serving;
     const confMap = { high: '高信心', medium: '中信心', low: '低信心' };
     document.getElementById('result-confidence').textContent = confMap[data.confidence] || data.confidence;
+
     const riskBadge = document.getElementById('result-risk-badge');
     const riskMap = { low: ['🟢 生酮風險低', 'low'], medium: ['🟡 生酮風險中', 'medium'], high: ['🔴 生酮風險高', 'high'] };
     const [label, cls] = riskMap[data.keto_risk] || ['🟡 未知', 'medium'];
-    riskBadge.textContent = label; riskBadge.className = `keto-risk-badge ${cls}`;
+    riskBadge.textContent = label;
+    riskBadge.className = `keto-risk-badge ${cls}`;
+
     document.getElementById('r-calories').textContent = Math.round(data.calories);
     document.getElementById('r-fat').textContent = data.fat_g.toFixed(1);
     document.getElementById('r-protein').textContent = data.protein_g.toFixed(1);
     document.getElementById('r-carb').textContent = data.carb_g.toFixed(1);
+
     const notesEl = document.getElementById('result-notes');
-    if (data.notes) { notesEl.textContent = `📝 ${data.notes}`; notesEl.classList.remove('hidden'); }
+    if (data.notes) {
+      notesEl.textContent = `📝 ${data.notes}`;
+      notesEl.classList.remove('hidden');
+    }
+
     document.getElementById('edit-name').value = data.food_name;
     document.getElementById('edit-calories').value = Math.round(data.calories);
     document.getElementById('edit-fat').value = data.fat_g.toFixed(1);
@@ -226,7 +324,10 @@ export function renderRecord(container) {
       fat_g: Number(document.getElementById('manual-fat').value) || 0,
       protein_g: Number(document.getElementById('manual-protein').value) || 0,
       carb_g: Number(document.getElementById('manual-carb').value) || 0,
-      fiber_g: 0, image_base64: null, source: 'manual', notes: '',
+      fiber_g: 0,
+      image_base64: null,
+      source: 'manual',
+      notes: '',
     };
     await persistMeal(meal);
   }
@@ -245,6 +346,7 @@ export function renderRecord(container) {
   }
 }
 
+// ===== Image Compression =====
 async function compressImage(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -257,7 +359,8 @@ async function compressImage(file) {
       const canvas = document.createElement('canvas');
       canvas.width = width; canvas.height = height;
       canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      resolve(dataUrl.split(',')[1]);
     };
     img.onerror = reject;
     img.src = URL.createObjectURL(file);
@@ -282,9 +385,14 @@ async function makeThumbnail(base64, mime) {
   });
 }
 
+// ===== Toast =====
 export function showToast(msg, duration = 2500) {
   let toast = document.querySelector('.save-indicator');
-  if (!toast) { toast = document.createElement('div'); toast.className = 'save-indicator'; document.getElementById('app').appendChild(toast); }
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.className = 'save-indicator';
+    document.getElementById('app').appendChild(toast);
+  }
   toast.textContent = msg;
   toast.classList.add('show');
   setTimeout(() => toast.classList.remove('show'), duration);

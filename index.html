@@ -17,28 +17,52 @@
 </head>
 <body>
   <div id="app">
+    <!-- 載入中 -->
     <div id="splash-screen" class="splash">
       <div class="splash-content">
-        <div class="splash-icon">&#x1F951;</div>
+        <div class="splash-icon">🥑</div>
         <h1>酮食記</h1>
         <p>生酮飲食追蹤</p>
         <div class="spinner"></div>
       </div>
     </div>
-    <main id="main-content" class="hidden"></main>
+
+    <!-- 主內容區 -->
+    <main id="main-content" class="hidden">
+      <!-- 各頁面透過 JS 動態載入 -->
+    </main>
+
+    <!-- 底部導航 -->
     <nav id="bottom-nav" class="bottom-nav hidden">
-      <button class="nav-btn active" data-page="record"><span class="nav-icon">&#x1F4F7;</span><span class="nav-label">記錄</span></button>
-      <button class="nav-btn" data-page="dashboard"><span class="nav-icon">&#x1F4CA;</span><span class="nav-label">今日</span></button>
-      <button class="nav-btn" data-page="history"><span class="nav-icon">&#x1F4C5;</span><span class="nav-label">歷史</span></button>
-      <button class="nav-btn" data-page="settings"><span class="nav-icon">&#x2699;&#xFE0F;</span><span class="nav-label">設定</span></button>
+      <button class="nav-btn active" data-page="record">
+        <span class="nav-icon">📷</span>
+        <span class="nav-label">記錄</span>
+      </button>
+      <button class="nav-btn" data-page="dashboard">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">今日</span>
+      </button>
+      <button class="nav-btn" data-page="history">
+        <span class="nav-icon">📅</span>
+        <span class="nav-label">歷史</span>
+      </button>
+      <button class="nav-btn" data-page="settings">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">設定</span>
+      </button>
     </nav>
   </div>
+
+  <!-- 安裝 PWA 提示 -->
   <div id="install-prompt" class="install-prompt hidden">
     <span>加入主畫面，隨時快速記錄</span>
     <button id="install-btn">安裝</button>
     <button id="install-dismiss">✕</button>
   </div>
+
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Firebase -->
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

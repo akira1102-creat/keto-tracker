@@ -51,8 +51,11 @@ export async function analyzeImage(base64Data, mimeType = 'image/jpeg') {
 
   const data = await res.json();
   const text = data.content?.[0]?.text || '';
+
+  // Extract JSON from response
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('PARSE_ERROR');
+
   const parsed = JSON.parse(jsonMatch[0]);
   return normalizeAnalysis(parsed);
 }

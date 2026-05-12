@@ -9,6 +9,8 @@ export async function renderSettings(container) {
   container.innerHTML = `
   <div class="page">
     <div class="page-header"><span style="font-size:24px">⚙️</span><h1>設定</h1></div>
+
+    <!-- API Keys -->
     <div class="settings-section">
       <div class="settings-section-title">AI 分析設定</div>
       <div class="card">
@@ -22,6 +24,8 @@ export async function renderSettings(container) {
         </div>
       </div>
     </div>
+
+    <!-- Keto Goals -->
     <div class="settings-section">
       <div class="settings-section-title">每日目標</div>
       <div class="card">
@@ -56,6 +60,8 @@ export async function renderSettings(container) {
         <div id="pct-warning" class="text-warning hidden" style="font-size:12px;margin-bottom:8px">⚠️ 比例加總不等於 100%</div>
       </div>
     </div>
+
+    <!-- Body Info -->
     <div class="settings-section">
       <div class="settings-section-title">個人資料</div>
       <div class="card">
@@ -71,24 +77,46 @@ export async function renderSettings(container) {
         </div>
       </div>
     </div>
+
+    <!-- Firebase Config -->
     <div class="settings-section">
       <div class="settings-section-title">Firebase 雲端同步（選填）</div>
       <div class="card">
         <div class="form-hint" style="margin-bottom:12px">不設定亦可使用，數據將儲存於本機</div>
-        <div class="form-group"><label class="form-label">API Key</label><input type="text" id="fb-api-key" class="form-input" value="${fbConfig?.apiKey || ''}" placeholder="AIza..."></div>
-        <div class="form-group"><label class="form-label">Auth Domain</label><input type="text" id="fb-auth-domain" class="form-input" value="${fbConfig?.authDomain || ''}" placeholder="xxx.firebaseapp.com"></div>
-        <div class="form-group"><label class="form-label">Project ID</label><input type="text" id="fb-project-id" class="form-input" value="${fbConfig?.projectId || ''}" placeholder="your-project-id"></div>
-        <div class="form-group"><label class="form-label">Storage Bucket</label><input type="text" id="fb-storage-bucket" class="form-input" value="${fbConfig?.storageBucket || ''}" placeholder="xxx.appspot.com"></div>
+        <div class="form-group">
+          <label class="form-label">API Key</label>
+          <input type="text" id="fb-api-key" class="form-input" value="${fbConfig?.apiKey || ''}" placeholder="AIza...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Auth Domain</label>
+          <input type="text" id="fb-auth-domain" class="form-input" value="${fbConfig?.authDomain || ''}" placeholder="xxx.firebaseapp.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Project ID</label>
+          <input type="text" id="fb-project-id" class="form-input" value="${fbConfig?.projectId || ''}" placeholder="your-project-id">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Storage Bucket</label>
+          <input type="text" id="fb-storage-bucket" class="form-input" value="${fbConfig?.storageBucket || ''}" placeholder="xxx.appspot.com">
+        </div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Messaging Sender ID</label><input type="text" id="fb-msg-id" class="form-input" value="${fbConfig?.messagingSenderId || ''}"></div>
-          <div class="form-group"><label class="form-label">App ID</label><input type="text" id="fb-app-id" class="form-input" value="${fbConfig?.appId || ''}"></div>
+          <div class="form-group">
+            <label class="form-label">Messaging Sender ID</label>
+            <input type="text" id="fb-msg-id" class="form-input" value="${fbConfig?.messagingSenderId || ''}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">App ID</label>
+            <input type="text" id="fb-app-id" class="form-input" value="${fbConfig?.appId || ''}">
+          </div>
         </div>
       </div>
     </div>
+
     <button class="btn btn-primary mt-8" id="btn-save-settings">💾 儲存所有設定</button>
     <div style="height:16px"></div>
   </div>`;
 
+  // PCT total warning
   ['s-fat-pct','s-protein-pct','s-carb-pct'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', checkPctTotal);
   });
@@ -100,18 +128,27 @@ export async function renderSettings(container) {
       document.getElementById('api-key-status').textContent = '✓ 已設定 API Key';
       document.getElementById('api-key-status').classList.add('set');
     }
+
     const fat = parseInt(document.getElementById('s-fat-pct').value) || 70;
     const protein = parseInt(document.getElementById('s-protein-pct').value) || 25;
     const carb = parseInt(document.getElementById('s-carb-pct').value) || 5;
-    if (fat + protein + carb !== 100) { showToast('⚠️ 宏量比例加總不等於 100%'); return; }
+    if (fat + protein + carb !== 100) {
+      showToast('⚠️ 宏量比例加總不等於 100%');
+      return;
+    }
+
     const newProfile = {
       daily_calorie_goal: parseInt(document.getElementById('s-calorie-goal').value) || 2000,
       carb_limit_g: parseInt(document.getElementById('s-carb-limit').value) || 25,
-      fat_pct_goal: fat, protein_pct_goal: protein, carb_pct_goal: carb,
+      fat_pct_goal: fat,
+      protein_pct_goal: protein,
+      carb_pct_goal: carb,
       height_cm: parseFloat(document.getElementById('s-height').value) || null,
       weight_kg: parseFloat(document.getElementById('s-weight').value) || null,
     };
     await saveUserProfile(newProfile);
+
+    // Firebase config
     const fbApiKey = document.getElementById('fb-api-key').value.trim();
     if (fbApiKey) {
       setFirebaseConfig({
@@ -123,6 +160,7 @@ export async function renderSettings(container) {
         appId: document.getElementById('fb-app-id').value.trim(),
       });
     }
+
     showToast('✓ 設定已儲存');
   });
 }

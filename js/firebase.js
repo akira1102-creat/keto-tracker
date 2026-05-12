@@ -38,6 +38,7 @@ export function setFirebaseConfig(cfg) {
   localStorage.setItem('keto_firebase_config', JSON.stringify(cfg));
 }
 
+// ===== User Profile =====
 export async function getUserProfile() {
   if (!db || !currentUser) return getLocalProfile();
   try {
@@ -54,6 +55,7 @@ export async function saveUserProfile(profile) {
   } catch (e) { console.warn('Profile save failed:', e); }
 }
 
+// ===== Daily Logs =====
 export async function getDailyLog(dateStr) {
   const local = getLocalLog(dateStr);
   if (!db || !currentUser) return local;
@@ -86,6 +88,7 @@ export async function getHistoryLogs(months = 3) {
   } catch { return local; }
 }
 
+// ===== Local Storage fallback =====
 export function getLocalProfile() {
   try {
     const raw = localStorage.getItem('keto_profile');
@@ -134,6 +137,7 @@ export function getLocalHistory() {
   return logs.sort((a, b) => b.date.localeCompare(a.date));
 }
 
+// ===== Meal helpers =====
 export function calcDayTotals(meals) {
   return meals.reduce((acc, m) => {
     acc.total_calories += m.calories || 0;
@@ -157,6 +161,7 @@ export function getTodayStr() {
   return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Macau' });
 }
 
+// ===== Offline queue sync =====
 export async function syncOfflineQueue() {
   const queue = JSON.parse(localStorage.getItem('keto_offline_queue') || '[]');
   if (!queue.length || !db || !currentUser) return;
