@@ -50,11 +50,13 @@ export function calcDayTotals(meals) {
   }, { total_calories: 0, total_fat_g: 0, total_protein_g: 0, total_carb_g: 0 });
 }
 
+// Keto status: based on carb limit only (as per user setting)
+// edge/risk only triggered when carb exceeds limit
 export function calcKetoStatus(totals, profile) {
-  const fatPct = totals.total_calories > 0 ? (totals.total_fat_g * 9 / totals.total_calories * 100) : 100;
-  if (totals.total_carb_g > 50 || fatPct < 60) return 'risk';
-  if (totals.total_carb_g > (profile.carb_limit_g || 25) || fatPct < 65) return 'edge';
-  return 'keto';
+  const carbLimit = profile.carb_limit_g || 25;
+  if (totals.total_carb_g > carbLimit * 2) return 'risk';   // >2x limit = out of keto
+  if (totals.total_carb_g > carbLimit) return 'edge';        // >limit but <=2x = edge
+  return 'keto';                                              // within limit = keto OK
 }
 
 export function getTodayStr() {

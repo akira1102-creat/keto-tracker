@@ -25,10 +25,56 @@ export function updateNavBadge() {
   }
 }
 
+// Persistent top banner shown on every page while analysis is running or just done
+function updateGlobalAnalysisBanner() {
+  const s = window.__ketoAnalysis;
+  let banner = document.getElementById('keto-analysis-banner');
+  if (s.status === 'idle' || s.status === 'error') {
+    if (banner) banner.remove();
+    return;
+  }
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'keto-analysis-banner';
+    banner.style.cssText = [
+      'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:9999',
+      'display:flex', 'align-items:center', 'gap:10px',
+      'padding:10px 16px',
+      'font-size:13px', 'font-weight:600',
+      'box-shadow:0 2px 8px rgba(0,0,0,0.15)',
+      'transition:background 0.3s',
+    ].join(';');
+    document.body.appendChild(banner);
+  }
+  if (s.status === 'running') {
+    banner.style.background = 'var(--color-primary, #01696f)';
+    banner.style.color = '#fff';
+    banner.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;border-color:rgba(255,255,255,0.3);border-top-color:#fff;flex-shrink:0"></div><span>AI 分析中⋯可先去其他頁面</span>';
+  } else if (s.status === 'done') {
+    banner.style.background = 'var(--color-success, #437a22)';
+    banner.style.color = '#fff';
+    banner.innerHTML = '<span style="font-size:18px">\u2713</span><span>分析完成！<a href="#" id="banner-go-record" style="color:#fff;text-decoration:underline;margin-left:6px">前往儲存</a></span><button id="banner-dismiss" style="margin-left:auto;background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1">\u00d7</button>';
+    document.getElementById('banner-go-record')?.addEventListener('click', e => {
+      e.preventDefault();
+      banner.remove();
+      navigate('record');
+    });
+    document.getElementById('banner-dismiss')?.addEventListener('click', () => {
+      window.__ketoAnalysis.status = 'idle';
+      updateNavBadge();
+      banner.remove();
+    });
+  }
+}
+
+// Expose so app.js / router can re-check on page change
+window.__updateAnalysisBanner = updateGlobalAnalysisBanner;
+
 let _bgCheckTimer = null;
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     const s = window.__ketoAnalysis;
+    updateGlobalAnalysisBanner();
     if (s.status === 'running') {
       clearTimeout(_bgCheckTimer);
       _bgCheckTimer = setTimeout(() => {
@@ -36,6 +82,7 @@ document.addEventListener('visibilitychange', () => {
           window.__ketoAnalysis.status = 'error';
           window.__ketoAnalysis.errorMsg = '\u5f8c\u53f0\u4e2d\u65b7\uff0c\u8acb\u91cd\u8a66';
           updateNavBadge();
+          updateGlobalAnalysisBanner();
           const analyzingSection = document.getElementById('analyzing-section');
           const manualSection = document.getElementById('manual-section');
           if (analyzingSection) analyzingSection.classList.add('hidden');
@@ -51,9 +98,7 @@ document.addEventListener('visibilitychange', () => {
 
 // ===== Cloud save helper =====
 async function saveLogCloud(dateStr, log) {
-  // Always save locally first
   saveLocalLog(dateStr, log);
-  // Then push to Firestore if logged in
   if (window.__ketoUser) {
     try {
       const { saveDailyLog } = await import('./firebase.js');
@@ -62,6 +107,16 @@ async function saveLogCloud(dateStr, log) {
       console.warn('[keto] cloud save failed, queued locally:', e);
     }
   }
+}
+
+// Delete a meal from a given date and sync
+export async function deleteMeal(dateStr, mealId) {
+  const log = getLocalLog(dateStr);
+  log.meals = (log.meals || []).filter(m => m.id !== mealId);
+  const totals = calcDayTotals(log.meals);
+  const profile = getLocalProfile();
+  Object.assign(log, totals, { date: dateStr, keto_status: calcKetoStatus(totals, profile) });
+  await saveLogCloud(dateStr, log);
 }
 
 export function renderRecord(container) {
@@ -145,7 +200,7 @@ export function renderRecord(container) {
           <div class="card-title">\u5FAE\u8ABF\u6578\u5024\uFF08\u53EF\u9078\uFF09</div>
           <div class="form-row">
             <div class="form-group"><label class="form-label">\u98DF\u7269\u540D\u7A31</label><input type="text" id="edit-name" class="form-input"></div>
-            <div class="form-group"><label class="form-label">\u71B1\u91CF (kcal)</label><input type="number" id="edit-calories" class="form-input" min="0"></div>
+            <div class="form-group"><label class="form-label">\u71B1\u91CF (kcal)<span style="font-size:10px;color:var(--color-text-muted)"> \u7A7A\u767D=\u81EA\u52D5\u8A08\u7B97</span></label><input type="number" id="edit-calories" class="form-input" min="0" placeholder="\u7559\u7A7A\u81EA\u52D5\u8A08\u7B97"></div>
           </div>
           <div class="form-row">
             <div class="form-group"><label class="form-label">\u8102\u80AA (g)</label><input type="number" id="edit-fat" class="form-input" min="0" step="0.1"></div>
@@ -168,7 +223,7 @@ export function renderRecord(container) {
         <div class="card-title">\u624B\u52D5\u8F38\u5165</div>
         <div class="form-group"><label class="form-label">\u98DF\u7269\u540D\u7A31</label><input type="text" id="manual-name" class="form-input" placeholder="\u4F8B\uFF1A\u7267\u6CB9\u679C\u6C99\u62C9"></div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">\u71B1\u91CF (kcal)</label><input type="number" id="manual-calories" class="form-input" min="0" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">\u71B1\u91CF (kcal)<span style="font-size:10px;color:var(--color-text-muted)"> \u7A7A\u767D=\u81EA\u52D5\u8A08\u7B97</span></label><input type="number" id="manual-calories" class="form-input" min="0" placeholder="\u7559\u7A7A\u81EA\u52D5\u8A08\u7B97"></div>
           <div class="form-group"><label class="form-label">\u8102\u80AA (g)</label><input type="number" id="manual-fat" class="form-input" min="0" step="0.1" placeholder="0"></div>
         </div>
         <div class="form-row">
@@ -235,6 +290,7 @@ export function renderRecord(container) {
     window.__ketoAnalysis.status = 'idle';
     window.__ketoAnalysis.data = null;
     updateNavBadge();
+    updateGlobalAnalysisBanner();
     uploadSection.classList.remove('hidden');
   });
   document.getElementById('btn-save-meal').addEventListener('click', saveMeal);
@@ -270,6 +326,7 @@ export function renderRecord(container) {
     window.__ketoAnalysis.data = null;
     window.__ketoAnalysis.imageBase64 = null;
     updateNavBadge();
+    updateGlobalAnalysisBanner();
     uploadSection.classList.remove('hidden');
     previewSection.classList.add('hidden');
     resultSection.classList.add('hidden');
@@ -288,6 +345,7 @@ export function renderRecord(container) {
     window.__ketoAnalysis.errorMsg = '';
     window.__ketoAnalysis._bgAt = null;
     updateNavBadge();
+    updateGlobalAnalysisBanner();
     try {
       const result = await analyzeImage(currentImageBase64, currentMimeType);
       clearTimeout(_bgCheckTimer);
@@ -296,6 +354,7 @@ export function renderRecord(container) {
       window.__ketoAnalysis.status = 'done';
       window.__ketoAnalysis.data = result;
       updateNavBadge();
+      updateGlobalAnalysisBanner();
       analyzingSection.classList.add('hidden');
       renderResult(result);
       resultSection.classList.remove('hidden');
@@ -311,6 +370,7 @@ export function renderRecord(container) {
       window.__ketoAnalysis.status = 'error';
       window.__ketoAnalysis.errorMsg = msg;
       updateNavBadge();
+      updateGlobalAnalysisBanner();
       analyzingSection.classList.add('hidden');
       showToast(msg);
       manualSection.classList.remove('hidden');
@@ -356,17 +416,28 @@ export function renderRecord(container) {
     document.getElementById('edit-fiber').value = (data.fiber_g * mult).toFixed(1);
   }
 
+  // Auto-calc calories from macros if left blank
+  function resolveCalories(caloriesInput, fat, protein, carb) {
+    const v = parseFloat(caloriesInput);
+    if (v > 0) return v;
+    return Math.round(fat * 9 + protein * 4 + carb * 4);
+  }
+
   async function saveMeal() {
     const dateStr = getSelectedDate();
     const data = window.__ketoAnalysis.data || analysisData;
+    const fat = Number(document.getElementById('edit-fat').value) || 0;
+    const protein = Number(document.getElementById('edit-protein').value) || 0;
+    const carb = Number(document.getElementById('edit-carb').value) || 0;
+    const caloriesRaw = document.getElementById('edit-calories').value;
     const meal = {
       id: Date.now().toString(),
       timestamp: new Date().toISOString(),
       food_name: document.getElementById('edit-name').value || data?.food_name || '\u672A\u77E5\u98DF\u7269',
-      calories: Number(document.getElementById('edit-calories').value) || 0,
-      fat_g: Number(document.getElementById('edit-fat').value) || 0,
-      protein_g: Number(document.getElementById('edit-protein').value) || 0,
-      carb_g: Number(document.getElementById('edit-carb').value) || 0,
+      calories: resolveCalories(caloriesRaw, fat, protein, carb),
+      fat_g: fat,
+      protein_g: protein,
+      carb_g: carb,
       fiber_g: Number(document.getElementById('edit-fiber').value) || 0,
       image_base64: currentImageBase64 ? await makeThumbnail(currentImageBase64, currentMimeType) : null,
       source: 'camera',
@@ -376,6 +447,7 @@ export function renderRecord(container) {
     window.__ketoAnalysis.data = null;
     window.__ketoAnalysis.imageBase64 = null;
     updateNavBadge();
+    updateGlobalAnalysisBanner();
     await persistMeal(meal, dateStr);
   }
 
@@ -383,14 +455,18 @@ export function renderRecord(container) {
     const name = document.getElementById('manual-name').value.trim();
     if (!name) { showToast('\u8ACB\u8F38\u5165\u98DF\u7269\u540D\u7A31'); return; }
     const dateStr = getSelectedDate();
+    const fat = Number(document.getElementById('manual-fat').value) || 0;
+    const protein = Number(document.getElementById('manual-protein').value) || 0;
+    const carb = Number(document.getElementById('manual-carb').value) || 0;
+    const caloriesRaw = document.getElementById('manual-calories').value;
     await persistMeal({
       id: Date.now().toString(),
       timestamp: new Date().toISOString(),
       food_name: name,
-      calories: Number(document.getElementById('manual-calories').value) || 0,
-      fat_g: Number(document.getElementById('manual-fat').value) || 0,
-      protein_g: Number(document.getElementById('manual-protein').value) || 0,
-      carb_g: Number(document.getElementById('manual-carb').value) || 0,
+      calories: resolveCalories(caloriesRaw, fat, protein, carb),
+      fat_g: fat,
+      protein_g: protein,
+      carb_g: carb,
       fiber_g: 0, image_base64: null, source: 'manual', notes: '',
     }, dateStr);
   }
@@ -402,7 +478,6 @@ export function renderRecord(container) {
     const totals = calcDayTotals(log.meals);
     const profile = getLocalProfile();
     Object.assign(log, totals, { date: dateStr, keto_status: calcKetoStatus(totals, profile) });
-    // Save locally + cloud
     await saveLogCloud(dateStr, log);
     const isToday = dateStr === todayStr;
     showToast(isToday ? '\u2713 \u9910\u9EDE\u5DF2\u5132\u5B58' : `\u2713 \u5DF2\u8F38\u5165 ${dateStr} \u7684\u8A18\u9304`);

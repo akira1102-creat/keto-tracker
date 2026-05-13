@@ -1,5 +1,5 @@
 import { getLocalLog, saveLocalLog, calcDayTotals, calcKetoStatus, getTodayStr, getLocalProfile } from './store.js';
-import { showToast } from './camera.js';
+import { showToast, deleteMeal } from './camera.js';
 import { navigate } from './router.js';
 
 let macroChart = null;
@@ -17,9 +17,9 @@ export function renderDashboard(container) {
   const proteinGoal = goal * (profile.protein_pct_goal || 25) / 100 / 4;
 
   const statusConfig = {
-    keto: { label: '🟢 在酮中', cls: 'keto', sub: '維持生酮狀態，繼續保持！' },
-    edge: { label: '🟡 邊緣狀態', cls: 'edge', sub: '接近碳水上限，注意飲食' },
-    risk: { label: '🔴 出酮風險', cls: 'risk', sub: '碳水攝取過多，調整飲食' },
+    keto: { label: '\uD83D\uDFE2 \u5728\u9162\u4E2D', cls: 'keto', sub: '\u78B3\u6C34\u5728\u76EE\u6A19\u5167\uFF0C\u7E7C\u7E8C\u4FDD\u6301\uFF01' },
+    edge: { label: '\uD83D\uDFE1 \u908A\u7DE3\u72C0\u614B', cls: 'edge', sub: '\u63A5\u8FD1\u78B3\u6C34\u4E0A\u9650\uFF0C\u6CE8\u610F\u98F2\u98DF' },
+    risk: { label: '\uD83D\uDD34 \u51FA\u9162\u98A8\u96AA', cls: 'risk', sub: '\u78B3\u6C34\u651D\u53D6\u904E\u591A\uFF0C\u8ABF\u6574\u98F2\u98DF' },
   };
   const sc = statusConfig[status] || statusConfig.keto;
   const caloriePct = Math.min(100, Math.round(totals.total_calories / goal * 100));
@@ -31,15 +31,15 @@ export function renderDashboard(container) {
   container.innerHTML = `
   <div class="page">
     <div class="page-header">
-      <span style="font-size:24px">📊</span>
-      <h1>今日概況</h1>
+      <span style="font-size:24px">\uD83D\uDCCA</span>
+      <h1>\u4ECA\u65E5\u6982\u6CC1</h1>
       <span class="text-muted" style="font-size:13px;margin-left:auto">${todayLabel}</span>
     </div>
     <div class="status-badge ${sc.cls}">
       <div><div>${sc.label}</div><div style="font-size:13px;font-weight:400;opacity:0.8;margin-top:2px">${sc.sub}</div></div>
     </div>
     <div class="card">
-      <div class="card-title">今日熱量</div>
+      <div class="card-title">\u4ECA\u65E5\u71B1\u91CF</div>
       <div class="calorie-row">
         <span class="calorie-current">${Math.round(totals.total_calories)}</span>
         <span class="calorie-goal">/ ${goal} kcal</span>
@@ -48,37 +48,37 @@ export function renderDashboard(container) {
       <div style="font-size:12px;color:var(--color-text-muted);margin-top:6px;text-align:right">${caloriePct}%</div>
     </div>
     <div class="card">
-      <div class="card-title">宏量分析</div>
+      <div class="card-title">\u5B8F\u91CF\u5206\u6790</div>
       <div style="display:flex;gap:16px;align-items:flex-start">
         <div class="chart-container" style="width:160px;height:160px;flex-shrink:0">
           <canvas id="macro-chart"></canvas>
-          ${totals.total_calories === 0 ? '<div style="position:absolute;font-size:13px;color:var(--color-text-muted)">尚無數據</div>' : ''}
+          ${totals.total_calories === 0 ? '<div style="position:absolute;font-size:13px;color:var(--color-text-muted)">' + '\u5C1A\u7121\u6578\u64DA' + '</div>' : ''}
         </div>
         <div style="flex:1">
           <div class="macro-bars">
             <div class="macro-bar-row">
               <div class="macro-bar-header">
-                <div class="macro-bar-label"><span class="macro-dot fat"></span>脂肪</div>
+                <div class="macro-bar-label"><span class="macro-dot fat"></span>\u8102\u80AA</div>
                 <span>${totals.total_fat_g.toFixed(1)}g / ${Math.round(fatGoal)}g</span>
               </div>
               <div class="progress-bar"><div class="progress-fill progress-fat" style="width:${Math.min(100, totals.total_fat_g / fatGoal * 100)}%"></div></div>
-              <div style="font-size:11px;color:var(--color-text-muted);margin-top:3px">${fatPct}% 熱量來源</div>
+              <div style="font-size:11px;color:var(--color-text-muted);margin-top:3px">${fatPct}% \u71B1\u91CF\u4F86\u6E90</div>
             </div>
             <div class="macro-bar-row">
               <div class="macro-bar-header">
-                <div class="macro-bar-label"><span class="macro-dot protein"></span>蛋白質</div>
+                <div class="macro-bar-label"><span class="macro-dot protein"></span>\u86CB\u767D\u8CEA</div>
                 <span>${totals.total_protein_g.toFixed(1)}g / ${Math.round(proteinGoal)}g</span>
               </div>
               <div class="progress-bar"><div class="progress-fill progress-protein" style="width:${Math.min(100, totals.total_protein_g / proteinGoal * 100)}%"></div></div>
-              <div style="font-size:11px;color:var(--color-text-muted);margin-top:3px">${proteinPct}% 熱量來源</div>
+              <div style="font-size:11px;color:var(--color-text-muted);margin-top:3px">${proteinPct}% \u71B1\u91CF\u4F86\u6E90</div>
             </div>
             <div class="macro-bar-row">
               <div class="macro-bar-header">
-                <div class="macro-bar-label"><span class="macro-dot carb"></span>淨碳水</div>
+                <div class="macro-bar-label"><span class="macro-dot carb"></span>\u6DE8\u78B3\u6C34</div>
                 <span style="color:${totals.total_carb_g > carbLimit ? 'var(--color-danger)' : 'inherit'}">${totals.total_carb_g.toFixed(1)}g / ${carbLimit}g</span>
               </div>
               <div class="progress-bar"><div class="progress-fill progress-carb" style="width:${Math.min(100, totals.total_carb_g / carbLimit * 100)}%;${totals.total_carb_g > carbLimit ? 'background:var(--color-danger)' : ''}"></div></div>
-              <div style="font-size:11px;color:var(--color-text-muted);margin-top:3px">${carbPct}% 熱量來源</div>
+              <div style="font-size:11px;color:var(--color-text-muted);margin-top:3px">${carbPct}% \u71B1\u91CF\u4F86\u6E90</div>
             </div>
           </div>
         </div>
@@ -86,8 +86,8 @@ export function renderDashboard(container) {
     </div>
     <div class="card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-        今日餐點
-        <span style="font-size:12px;color:var(--color-text-muted)">${(log.meals || []).length} 筆記錄</span>
+        \u4ECA\u65E5\u9910\u9EDE
+        <span style="font-size:12px;color:var(--color-text-muted)">${(log.meals || []).length} \u7B46\u8A18\u9304</span>
       </div>
       ${renderMealList(log.meals || [], dateStr)}
     </div>
@@ -96,35 +96,31 @@ export function renderDashboard(container) {
   initChart(totals);
 
   container.querySelectorAll('.meal-delete-btn').forEach(btn => {
-    btn.addEventListener('click', e => {
+    btn.addEventListener('click', async e => {
       e.stopPropagation();
-      if (!confirm('確定刪除此餐點？')) return;
+      if (!confirm('\u78BA\u5B9A\u522A\u9664\u6B64\u9910\u9EDE\uFF1F')) return;
       const { id, date } = btn.dataset;
-      const log2 = getLocalLog(date);
-      log2.meals = (log2.meals || []).filter(m => m.id !== id);
-      const totals2 = calcDayTotals(log2.meals);
-      const profile2 = getLocalProfile();
-      Object.assign(log2, totals2, { date, keto_status: calcKetoStatus(totals2, profile2) });
-      saveLocalLog(date, log2);
-      navigate('dashboard');
+      await deleteMeal(date, id);
+      showToast('\u5DF2\u522A\u9664');
+      renderDashboard(container);
     });
   });
 }
 
 function renderMealList(meals, dateStr) {
-  if (!meals.length) return `<div class="empty-state" style="padding:24px 0"><div class="empty-icon">🍽️</div><p>今日尚未記錄任何餐點<br>點擊下方「記錄」開始</p></div>`;
+  if (!meals.length) return `<div class="empty-state" style="padding:24px 0"><div class="empty-icon">\uD83C\uDF7D\uFE0F</div><p>\u4ECA\u65E5\u5C1A\u672A\u8A18\u9304\u4EFB\u4F55\u9910\u9EDE<br>\u9EDE\u64CA\u4E0B\u65B9\u300C\u8A18\u9304\u300D\u958B\u59CB</p></div>`;
   return `<div class="meal-list">${meals.map(m => `
     <div class="meal-item" data-id="${m.id}">
-      ${m.image_base64 ? `<img class="meal-thumb" src="data:image/jpeg;base64,${m.image_base64}" alt="${m.food_name}">` : `<div class="meal-thumb-placeholder">🍽️</div>`}
+      ${m.image_base64 ? `<img class="meal-thumb" src="data:image/jpeg;base64,${m.image_base64}" alt="${m.food_name}">` : `<div class="meal-thumb-placeholder">\uD83C\uDF7D\uFE0F</div>`}
       <div class="meal-info">
         <div class="meal-name">${m.food_name}</div>
         <div class="meal-time">${formatTime(m.timestamp)}</div>
-        <div class="meal-macros">脂 ${m.fat_g?.toFixed(1)}g · 蛋 ${m.protein_g?.toFixed(1)}g · 碳 ${m.carb_g?.toFixed(1)}g</div>
+        <div class="meal-macros">\u8102 ${m.fat_g?.toFixed(1)}g \u00B7 \u86CB ${m.protein_g?.toFixed(1)}g \u00B7 \u78B3 ${m.carb_g?.toFixed(1)}g</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         <span class="meal-kcal">${Math.round(m.calories)}</span>
         <span style="font-size:10px;color:var(--color-text-muted)">kcal</span>
-        <button class="meal-delete-btn" data-id="${m.id}" data-date="${dateStr}">🗑️</button>
+        <button class="meal-delete-btn" data-id="${m.id}" data-date="${dateStr}" aria-label="\u522A\u9664\u9910\u9EDE" style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 4px;color:var(--color-text-muted)">\uD83D\uDDD1\uFE0F</button>
       </div>
     </div>`).join('')}</div>`;
 }
@@ -140,7 +136,7 @@ function initChart(totals) {
   macroChart = new Chart(canvas, {
     type: 'doughnut',
     data: {
-      labels: ['脂肪', '蛋白質', '碳水'],
+      labels: ['\u8102\u80AA', '\u86CB\u767D\u8CEA', '\u78B3\u6C34'],
       datasets: [{ data: total > 0 ? [fatCal, proteinCal, carbCal] : [70, 25, 5], backgroundColor: ['#d4a017', '#4caf50', '#2196f3'], borderWidth: 0, hoverOffset: 4 }]
     },
     options: {
