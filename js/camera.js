@@ -25,7 +25,7 @@ export function updateNavBadge() {
   }
 }
 
-// Persistent top banner shown on every page while analysis is running or just done
+// 全頁面頂部 banner：分析中 / 分析完成
 function updateGlobalAnalysisBanner() {
   const s = window.__ketoAnalysis;
   let banner = document.getElementById('keto-analysis-banner');
@@ -39,35 +39,43 @@ function updateGlobalAnalysisBanner() {
     banner.style.cssText = [
       'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:9999',
       'display:flex', 'align-items:center', 'gap:10px',
-      'padding:10px 16px',
-      'font-size:13px', 'font-weight:600',
-      'box-shadow:0 2px 8px rgba(0,0,0,0.15)',
+      'padding:12px 16px',
+      'font-size:14px', 'font-weight:600',
+      'box-shadow:0 2px 8px rgba(0,0,0,0.18)',
       'transition:background 0.3s',
+      'cursor:pointer',
     ].join(';');
     document.body.appendChild(banner);
   }
   if (s.status === 'running') {
     banner.style.background = 'var(--color-primary, #01696f)';
     banner.style.color = '#fff';
-    banner.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;border-color:rgba(255,255,255,0.3);border-top-color:#fff;flex-shrink:0"></div><span>AI 分析中⋯可先去其他頁面</span>';
+    banner.innerHTML = '<div class="spinner" style="width:18px;height:18px;border-width:2px;border-color:rgba(255,255,255,0.3);border-top-color:#fff;flex-shrink:0"></div><span>AI 分析中⋯可先去其他頁面</span>';
   } else if (s.status === 'done') {
-    banner.style.background = 'var(--color-success, #437a22)';
+    banner.style.background = '#1a7a2e';
     banner.style.color = '#fff';
-    banner.innerHTML = '<span style="font-size:18px">\u2713</span><span>分析完成！<a href="#" id="banner-go-record" style="color:#fff;text-decoration:underline;margin-left:6px">前往儲存</a></span><button id="banner-dismiss" style="margin-left:auto;background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1">\u00d7</button>';
-    document.getElementById('banner-go-record')?.addEventListener('click', e => {
-      e.preventDefault();
-      banner.remove();
+    banner.innerHTML = `
+      <span style="font-size:22px;flex-shrink:0">✅</span>
+      <span style="flex:1">分析完成！點此前往儲存</span>
+      <button id="banner-dismiss" style="background:rgba(255,255,255,0.25);border:none;color:#fff;font-size:13px;font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;flex-shrink:0">✕ 關閉</button>
+    `;
+    // 點 banner 本體跳去記錄頁
+    banner.onclick = e => {
+      if (e.target.id === 'banner-dismiss') return;
       navigate('record');
-    });
-    document.getElementById('banner-dismiss')?.addEventListener('click', () => {
+    };
+    document.getElementById('banner-dismiss')?.addEventListener('click', e => {
+      e.stopPropagation();
       window.__ketoAnalysis.status = 'idle';
       updateNavBadge();
       banner.remove();
     });
+    // 震動提示（如支援）
+    try { if (navigator.vibrate) navigator.vibrate([100, 50, 100]); } catch {}
   }
 }
 
-// Expose so app.js / router can re-check on page change
+// 暴露給 app.js / router 在換頁時重新檢查
 window.__updateAnalysisBanner = updateGlobalAnalysisBanner;
 
 let _bgCheckTimer = null;
@@ -80,14 +88,14 @@ document.addEventListener('visibilitychange', () => {
       _bgCheckTimer = setTimeout(() => {
         if (window.__ketoAnalysis.status === 'running') {
           window.__ketoAnalysis.status = 'error';
-          window.__ketoAnalysis.errorMsg = '\u5f8c\u53f0\u4e2d\u65b7\uff0c\u8acb\u91cd\u8a66';
+          window.__ketoAnalysis.errorMsg = '後台中斷，請重試';
           updateNavBadge();
           updateGlobalAnalysisBanner();
           const analyzingSection = document.getElementById('analyzing-section');
           const manualSection = document.getElementById('manual-section');
           if (analyzingSection) analyzingSection.classList.add('hidden');
           if (manualSection) manualSection.classList.remove('hidden');
-          showToast('\u5f8c\u53f0\u4e2d\u65b7\uff0c\u8acb\u91cd\u8a66');
+          showToast('後台中斷，請重試');
         }
       }, 3000);
     }
@@ -109,7 +117,7 @@ async function saveLogCloud(dateStr, log) {
   }
 }
 
-// Delete a meal from a given date and sync
+// 刪除指定日期的餐點並同步
 export async function deleteMeal(dateStr, mealId) {
   const log = getLocalLog(dateStr);
   log.meals = (log.meals || []).filter(m => m.id !== mealId);
@@ -126,27 +134,27 @@ export function renderRecord(container) {
   container.innerHTML = `
   <div class="page">
     <div class="page-header">
-      <span style="font-size:24px">\uD83D\uDCF7</span>
-      <h1>\u8A18\u9304\u98F2\u98DF</h1>
+      <span style="font-size:24px">📷</span>
+      <h1>記錄飲食</h1>
     </div>
 
     <div class="card" style="margin-bottom:12px;padding:12px 14px">
       <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:16px">\uD83D\uDCC5</span>
-        <label class="form-label" for="record-date" style="margin:0;font-weight:600">\u8A18\u9304\u65E5\u671F</label>
+        <span style="font-size:16px">📅</span>
+        <label class="form-label" for="record-date" style="margin:0;font-weight:600">記錄日期</label>
         <input type="date" id="record-date" class="form-input" value="${todayStr}" max="${todayStr}" style="flex:1;min-width:0">
       </div>
-      <div id="date-hint" style="font-size:12px;color:var(--color-text-muted);margin-top:6px;margin-left:26px">\uD83D\uDCCD \u4ECA\u65E5</div>
+      <div id="date-hint" style="font-size:12px;color:var(--color-text-muted);margin-top:6px;margin-left:26px">📍 今日</div>
     </div>
 
     <div id="upload-section">
       <div class="upload-zone" id="upload-zone">
-        <div class="upload-icon">\uD83E\uDD57</div>
-        <div class="upload-title">\u62CD\u651D\u6216\u9078\u64C7\u98DF\u7269\u5716\u7247</div>
-        <div class="upload-sub">\u652F\u63F4\u98DF\u7269\u76F8\u7247 &amp; \u71DF\u990A\u6A19\u7C64</div>
+        <div class="upload-icon">🥗</div>
+        <div class="upload-title">拍攝或選擇食物圖片</div>
+        <div class="upload-sub">支援食物相片 &amp; 營養標籤</div>
         <div class="upload-actions">
-          <button class="btn btn-primary" id="btn-camera">\uD83D\uDCF7 \u62CD\u7167</button>
-          <button class="btn btn-outline" id="btn-gallery">\uD83D\uDDBC\uFE0F \u76F8\u7C3F</button>
+          <button class="btn btn-primary" id="btn-camera">📷 拍照</button>
+          <button class="btn btn-outline" id="btn-gallery">🖼️ 相冊</button>
         </div>
       </div>
       <input type="file" id="file-camera" accept="image/*" capture="environment" style="display:none">
@@ -155,11 +163,11 @@ export function renderRecord(container) {
 
     <div id="preview-section" class="hidden">
       <div class="image-preview">
-        <img id="preview-img" src="" alt="\u98DF\u7269\u5716\u7247">
-        <button class="image-preview-remove" id="btn-remove-img">\u2715</button>
+        <img id="preview-img" src="" alt="食物圖片">
+        <button class="image-preview-remove" id="btn-remove-img">✕</button>
       </div>
       <div style="display:flex;gap:10px">
-        <button class="btn btn-primary" id="btn-analyze" style="flex:1">\uD83D\uDD0D \u958B\u59CB\u5206\u6790</button>
+        <button class="btn btn-primary" id="btn-analyze" style="flex:1">🔍 開始分析</button>
       </div>
     </div>
 
@@ -167,8 +175,8 @@ export function renderRecord(container) {
       <div class="card" style="display:flex;align-items:center;gap:14px;padding:18px 16px">
         <div class="spinner" style="width:28px;height:28px;border-width:3px;flex-shrink:0"></div>
         <div style="flex:1">
-          <div style="font-weight:700;font-size:15px">AI \u5206\u6790\u4E2D\u2026</div>
-          <div style="font-size:12px;color:var(--color-text-muted);margin-top:2px">\u53EF\u5148\u53BB\u5176\u4ED6\u9801\u9762\u67E5\u770B\u8CC7\u6599</div>
+          <div style="font-weight:700;font-size:15px">AI 分析中…</div>
+          <div style="font-size:12px;color:var(--color-text-muted);margin-top:2px">可先去其他頁面查看資料</div>
         </div>
       </div>
     </div>
@@ -185,56 +193,57 @@ export function renderRecord(container) {
         <div class="result-body">
           <div id="result-risk-badge" class="keto-risk-badge"></div>
           <div class="macro-grid">
-            <div class="macro-item"><div class="macro-label">\u71B1\u91CF</div><div><span class="macro-value calorie" id="r-calories">0</span><span class="macro-unit"> kcal</span></div></div>
-            <div class="macro-item"><div class="macro-label">\u8102\u80AA</div><div><span class="macro-value fat" id="r-fat">0</span><span class="macro-unit"> g</span></div></div>
-            <div class="macro-item"><div class="macro-label">\u86CB\u767D\u8CEA</div><div><span class="macro-value protein" id="r-protein">0</span><span class="macro-unit"> g</span></div></div>
-            <div class="macro-item"><div class="macro-label">\u6DE8\u78B3\u6C34</div><div><span class="macro-value carb" id="r-carb">0</span><span class="macro-unit"> g</span></div></div>
+            <div class="macro-item"><div class="macro-label">熱量</div><div><span class="macro-value calorie" id="r-calories">0</span><span class="macro-unit"> kcal</span></div></div>
+            <div class="macro-item"><div class="macro-label">脂肪</div><div><span class="macro-value fat" id="r-fat">0</span><span class="macro-unit"> g</span></div></div>
+            <div class="macro-item"><div class="macro-label">蛋白質</div><div><span class="macro-value protein" id="r-protein">0</span><span class="macro-unit"> g</span></div></div>
+            <div class="macro-item"><div class="macro-label">淨碳水</div><div><span class="macro-value carb" id="r-carb">0</span><span class="macro-unit"> g</span></div></div>
           </div>
           <div id="result-notes" class="result-notes hidden"></div>
           <div class="serving-adjuster">
-            <label for="serving-multiplier">\u5BE6\u969B\u4EFD\u91CF</label>
+            <label for="serving-multiplier">實際份量</label>
             <input type="number" id="serving-multiplier" class="form-input" value="1" min="0.1" max="10" step="0.1" style="max-width:80px">
-            <span>\u4EFD</span>
+            <span>份</span>
           </div>
           <div class="divider"></div>
-          <div class="card-title">\u5FAE\u8ABF\u6578\u5024\uFF08\u53EF\u9078\uFF09</div>
+          <div class="card-title">微調數值（可選）</div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">\u98DF\u7269\u540D\u7A31</label><input type="text" id="edit-name" class="form-input"></div>
-            <div class="form-group"><label class="form-label">\u71B1\u91CF (kcal)<span style="font-size:10px;color:var(--color-text-muted)"> \u7A7A\u767D=\u81EA\u52D5\u8A08\u7B97</span></label><input type="number" id="edit-calories" class="form-input" min="0" placeholder="\u7559\u7A7A\u81EA\u52D5\u8A08\u7B97"></div>
+            <div class="form-group"><label class="form-label">食物名稱</label><input type="text" id="edit-name" class="form-input"></div>
+            <div class="form-group"><label class="form-label">熱量 (kcal)<span style="font-size:10px;color:var(--color-text-muted)"> 留空=自動計算</span></label><input type="number" id="edit-calories" class="form-input" min="0" placeholder="留空自動計算"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">\u8102\u80AA (g)</label><input type="number" id="edit-fat" class="form-input" min="0" step="0.1"></div>
-            <div class="form-group"><label class="form-label">\u86CB\u767D\u8CEA (g)</label><input type="number" id="edit-protein" class="form-input" min="0" step="0.1"></div>
+            <div class="form-group"><label class="form-label">脂肪 (g)</label><input type="number" id="edit-fat" class="form-input" min="0" step="0.1"></div>
+            <div class="form-group"><label class="form-label">蛋白質 (g)</label><input type="number" id="edit-protein" class="form-input" min="0" step="0.1"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">\u6DE8\u78B3\u6C34 (g)</label><input type="number" id="edit-carb" class="form-input" min="0" step="0.1"></div>
-            <div class="form-group"><label class="form-label">\u81B3\u98DF\u7E96\u7DAD (g)</label><input type="number" id="edit-fiber" class="form-input" min="0" step="0.1"></div>
+            <div class="form-group"><label class="form-label">淨碳水 (g)</label><input type="number" id="edit-carb" class="form-input" min="0" step="0.1"></div>
+            <div class="form-group"><label class="form-label">膳食纖維 (g)</label><input type="number" id="edit-fiber" class="form-input" min="0" step="0.1"></div>
           </div>
         </div>
       </div>
       <div style="display:flex;gap:10px;margin-top:12px">
-        <button class="btn btn-outline" id="btn-reanalyze">\u91CD\u65B0\u5206\u6790</button>
-        <button class="btn btn-primary" id="btn-save-meal">\u2713 \u5132\u5B58\u9910\u9EDE</button>
+        <button class="btn btn-outline" id="btn-reanalyze">重新分析</button>
+        <button class="btn btn-primary" id="btn-save-meal">✓ 儲存餐點</button>
       </div>
     </div>
 
     <div id="manual-section" class="hidden">
       <div class="card">
-        <div class="card-title">\u624B\u52D5\u8F38\u5165</div>
-        <div class="form-group"><label class="form-label">\u98DF\u7269\u540D\u7A31</label><input type="text" id="manual-name" class="form-input" placeholder="\u4F8B\uFF1A\u7267\u6CB9\u679C\u6C99\u62C9"></div>
+        <div class="card-title">手動輸入</div>
+        <div class="form-group"><label class="form-label">食物名稱</label><input type="text" id="manual-name" class="form-input" placeholder="例：牧油果沙拉"></div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">\u71B1\u91CF (kcal)<span style="font-size:10px;color:var(--color-text-muted)"> \u7A7A\u767D=\u81EA\u52D5\u8A08\u7B97</span></label><input type="number" id="manual-calories" class="form-input" min="0" placeholder="\u7559\u7A7A\u81EA\u52D5\u8A08\u7B97"></div>
-          <div class="form-group"><label class="form-label">\u8102\u80AA (g)</label><input type="number" id="manual-fat" class="form-input" min="0" step="0.1" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">熱量 (kcal)<span style="font-size:10px;color:var(--color-text-muted)"> 留空=自動計算</span></label><input type="number" id="manual-calories" class="form-input" min="0" placeholder="留空自動計算"></div>
+          <div class="form-group"><label class="form-label">脂肪 (g)</label><input type="number" id="manual-fat" class="form-input" min="0" step="0.1" placeholder="0"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">\u86CB\u767D\u8CEA (g)</label><input type="number" id="manual-protein" class="form-input" min="0" step="0.1" placeholder="0"></div>
-          <div class="form-group"><label class="form-label">\u6DE8\u78B3\u6C34 (g)</label><input type="number" id="manual-carb" class="form-input" min="0" step="0.1" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">蛋白質 (g)</label><input type="number" id="manual-protein" class="form-input" min="0" step="0.1" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">淨碳水 (g)</label><input type="number" id="manual-carb" class="form-input" min="0" step="0.1" placeholder="0"></div>
         </div>
-        <button class="btn btn-primary mt-12" id="btn-save-manual">\u2713 \u5132\u5B58</button>
+        <p style="font-size:11px;color:var(--color-text-muted);margin-top:4px">💡 熱量留空時系統會從脂肪×9 + 蛋白質×4 + 碳水×4 自動計算</p>
+        <button class="btn btn-primary mt-12" id="btn-save-manual">✓ 儲存</button>
       </div>
     </div>
 
-    <button class="btn btn-outline mt-12" id="btn-manual-toggle" style="font-size:13px">\u270D\uFE0F \u624B\u52D5\u8F38\u5165</button>
+    <button class="btn btn-outline mt-12" id="btn-manual-toggle" style="font-size:13px">✍️ 手動輸入</button>
   </div>`;
 
   let currentImageBase64 = s.imageBase64 || null;
@@ -269,10 +278,10 @@ export function renderRecord(container) {
   function updateDateHint() {
     const val = recordDateInput.value;
     if (val === todayStr) {
-      dateHint.textContent = '\uD83D\uDCCD \u4ECA\u65E5';
+      dateHint.textContent = '📍 今日';
       dateHint.style.color = 'var(--color-text-muted)';
     } else {
-      dateHint.textContent = `\u2197\uFE0F \u8F38\u5165 ${val} \u7684\u8A18\u9304`;
+      dateHint.textContent = `↗️ 輸入 ${val} 的記錄`;
       dateHint.style.color = 'var(--color-warning)';
     }
   }
@@ -337,7 +346,7 @@ export function renderRecord(container) {
   async function doAnalyze() {
     if (!currentImageBase64) return;
     const apiKey = localStorage.getItem('keto_claude_api_key');
-    if (!apiKey) { showToast('\u8ACB\u5148\u5728\u8A2D\u5B9A\u9801\u9762\u8F38\u5165 Gemini API Key'); return; }
+    if (!apiKey) { showToast('請先在設定頁面輸入 Gemini API Key'); return; }
     previewSection.classList.add('hidden');
     analyzingSection.classList.remove('hidden');
     window.__ketoAnalysis.status = 'running';
@@ -361,12 +370,12 @@ export function renderRecord(container) {
     } catch (err) {
       clearTimeout(_bgCheckTimer);
       if (window.__ketoAnalysis.status === 'error') return;
-      let msg = '\u5206\u6790\u5931\u6557\uFF0C\u8ACB\u91CD\u8A66';
-      if (err.message === 'NO_API_KEY') msg = '\u8ACB\u5148\u8A2D\u5B9A API Key';
-      else if (err.message === 'PARSE_ERROR') msg = 'AI \u56DE\u50B3\u683C\u5F0F\u7570\u5E38\uFF0C\u8ACB\u91CD\u8A66';
-      else if (/timeout|time.?out|timedout/i.test(err.message)) msg = '\u5206\u6790\u903E\u6642\uFF0C\u8ACB\u91CD\u8A66';
-      else if (/network|fetch|failed to fetch/i.test(err.message)) msg = '\u7DB2\u7D61\u4E2D\u65B7\uFF0C\u8ACB\u91CD\u8A66';
-      else if (/AbortError/i.test(err.name)) msg = '\u5F8C\u53F0\u4E2D\u65B7\uFF0C\u8ACB\u91CD\u8A66';
+      let msg = '分析失敗，請重試';
+      if (err.message === 'NO_API_KEY') msg = '請先設定 API Key';
+      else if (err.message === 'PARSE_ERROR') msg = 'AI 回傳格式異常，請重試';
+      else if (/timeout|time.?out|timedout/i.test(err.message)) msg = '分析逾時，請重試';
+      else if (/network|fetch|failed to fetch/i.test(err.message)) msg = '網絡中斷，請重試';
+      else if (/AbortError/i.test(err.name)) msg = '後台中斷，請重試';
       window.__ketoAnalysis.status = 'error';
       window.__ketoAnalysis.errorMsg = msg;
       updateNavBadge();
@@ -380,18 +389,18 @@ export function renderRecord(container) {
   function renderResult(data) {
     document.getElementById('result-name').textContent = data.food_name;
     document.getElementById('result-serving').textContent = data.estimated_serving;
-    const confMap = { high: '\u9AD8\u4FE1\u5FC3', medium: '\u4E2D\u4FE1\u5FC3', low: '\u4F4E\u4FE1\u5FC3' };
+    const confMap = { high: '高信心', medium: '中信心', low: '低信心' };
     document.getElementById('result-confidence').textContent = confMap[data.confidence] || data.confidence;
     const riskBadge = document.getElementById('result-risk-badge');
-    const riskMap = { low: ['\uD83D\uDFE2 \u751F\u9162\u98A8\u96AA\u4F4E', 'low'], medium: ['\uD83D\uDFE1 \u751F\u9162\u98A8\u96AA\u4E2D', 'medium'], high: ['\uD83D\uDD34 \u751F\u9162\u98A8\u96AA\u9AD8', 'high'] };
-    const [label, cls] = riskMap[data.keto_risk] || ['\uD83D\uDFE1 \u672A\u77E5', 'medium'];
+    const riskMap = { low: ['🟢 生酮風險低', 'low'], medium: ['🟡 生酮風險中', 'medium'], high: ['🔴 生酮風險高', 'high'] };
+    const [label, cls] = riskMap[data.keto_risk] || ['🟡 未知', 'medium'];
     riskBadge.textContent = label; riskBadge.className = `keto-risk-badge ${cls}`;
     document.getElementById('r-calories').textContent = Math.round(data.calories);
     document.getElementById('r-fat').textContent = data.fat_g.toFixed(1);
     document.getElementById('r-protein').textContent = data.protein_g.toFixed(1);
     document.getElementById('r-carb').textContent = data.carb_g.toFixed(1);
     const notesEl = document.getElementById('result-notes');
-    if (data.notes) { notesEl.textContent = `\uD83D\uDCDD ${data.notes}`; notesEl.classList.remove('hidden'); }
+    if (data.notes) { notesEl.textContent = `📝 ${data.notes}`; notesEl.classList.remove('hidden'); }
     document.getElementById('edit-name').value = data.food_name;
     document.getElementById('edit-calories').value = Math.round(data.calories);
     document.getElementById('edit-fat').value = data.fat_g.toFixed(1);
@@ -416,7 +425,7 @@ export function renderRecord(container) {
     document.getElementById('edit-fiber').value = (data.fiber_g * mult).toFixed(1);
   }
 
-  // Auto-calc calories from macros if left blank
+  // 熱量留空時從三大營養素自動計算
   function resolveCalories(caloriesInput, fat, protein, carb) {
     const v = parseFloat(caloriesInput);
     if (v > 0) return v;
@@ -433,7 +442,7 @@ export function renderRecord(container) {
     const meal = {
       id: Date.now().toString(),
       timestamp: new Date().toISOString(),
-      food_name: document.getElementById('edit-name').value || data?.food_name || '\u672A\u77E5\u98DF\u7269',
+      food_name: document.getElementById('edit-name').value || data?.food_name || '未知食物',
       calories: resolveCalories(caloriesRaw, fat, protein, carb),
       fat_g: fat,
       protein_g: protein,
@@ -453,7 +462,7 @@ export function renderRecord(container) {
 
   async function saveManual() {
     const name = document.getElementById('manual-name').value.trim();
-    if (!name) { showToast('\u8ACB\u8F38\u5165\u98DF\u7269\u540D\u7A31'); return; }
+    if (!name) { showToast('請輸入食物名稱'); return; }
     const dateStr = getSelectedDate();
     const fat = Number(document.getElementById('manual-fat').value) || 0;
     const protein = Number(document.getElementById('manual-protein').value) || 0;
@@ -480,7 +489,7 @@ export function renderRecord(container) {
     Object.assign(log, totals, { date: dateStr, keto_status: calcKetoStatus(totals, profile) });
     await saveLogCloud(dateStr, log);
     const isToday = dateStr === todayStr;
-    showToast(isToday ? '\u2713 \u9910\u9EDE\u5DF2\u5132\u5B58' : `\u2713 \u5DF2\u8F38\u5165 ${dateStr} \u7684\u8A18\u9304`);
+    showToast(isToday ? '✓ 餐點已儲存' : `✓ 已輸入 ${dateStr} 的記錄`);
     setTimeout(() => navigate('dashboard'), 800);
   }
 }

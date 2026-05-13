@@ -50,13 +50,14 @@ export function calcDayTotals(meals) {
   }, { total_calories: 0, total_fat_g: 0, total_protein_g: 0, total_carb_g: 0 });
 }
 
-// Keto status: based on carb limit only (as per user setting)
-// edge/risk only triggered when carb exceeds limit
+// Keto status: 只睇碳水是否符合用戶設定值
+// 在限額內 = 生酮正常；超出限額 = 邊緣；超出2倍 = 風險
 export function calcKetoStatus(totals, profile) {
   const carbLimit = profile.carb_limit_g || 25;
-  if (totals.total_carb_g > carbLimit * 2) return 'risk';   // >2x limit = out of keto
-  if (totals.total_carb_g > carbLimit) return 'edge';        // >limit but <=2x = edge
-  return 'keto';                                              // within limit = keto OK
+  const carb = totals.total_carb_g || 0;
+  if (carb <= carbLimit) return 'keto';          // 符合設定 = 生酮OK
+  if (carb <= carbLimit * 1.5) return 'edge';    // 超出但<=1.5倍 = 邊緣
+  return 'risk';                                  // 超出1.5倍以上 = 風險
 }
 
 export function getTodayStr() {
