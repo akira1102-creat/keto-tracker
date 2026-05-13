@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2.3.8';
+const CACHE_VERSION = 'v2.4.0';
 const CACHE_NAME = `keto-tracker-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/keto-tracker/',
@@ -14,6 +14,11 @@ const STATIC_ASSETS = [
   '/keto-tracker/js/router.js',
   '/keto-tracker/js/firebase.js',
   '/keto-tracker/manifest.json',
+  '/keto-tracker/icons/android-chrome-192x192.png',
+  '/keto-tracker/icons/android-chrome-512x512.png',
+  '/keto-tracker/icons/apple-touch-icon.png',
+  '/keto-tracker/icons/favicon-96x96.png',
+  '/keto-tracker/icons/favicon.ico',
 ];
 const BYPASS_ORIGINS = [
   'accounts.google.com','oauth2.googleapis.com','www.googleapis.com',

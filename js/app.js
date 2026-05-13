@@ -1,8 +1,31 @@
 import { renderRecord } from './camera.js';
 import { renderDashboard } from './dashboard.js';
 import { renderHistory } from './history.js';
-import { renderSettings } from './settings.js';
+import { renderSettings, APP_VERSION } from './settings.js';
 import { navigate, registerPages } from './router.js';
+
+// ===== Version check: auto-clear cache when version changes =====
+(async () => {
+  const savedVersion = localStorage.getItem('keto_app_version');
+  if (savedVersion !== APP_VERSION) {
+    console.log(`[keto] Version changed: ${savedVersion} → ${APP_VERSION}, clearing Service Worker cache...`);
+    localStorage.setItem('keto_app_version', APP_VERSION);
+    // Unregister all service workers to force cache refresh
+    if ('serviceWorker' in navigator) {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) {
+          await reg.unregister();
+        }
+        console.log('[keto] Service Workers unregistered, reloading...');
+        // Reload after a short delay to ensure SW is unregistered
+        setTimeout(() => location.reload(), 500);
+      } catch (e) {
+        console.warn('[keto] Failed to unregister SW:', e);
+      }
+    }
+  }
+})();
 
 if (window.__clearSplashTimer) window.__clearSplashTimer();
 
@@ -93,7 +116,9 @@ try {
       badge.textContent = '!';
     }
   }
-  setInterval(updateNavBadge, 1000);
+
+  window.addEventListener('keto-analysis-change', updateNavBadge);
+  updateNavBadge();
 
   // Listen for sync events from firebase.js
   window.addEventListener('keto-synced', () => {
@@ -143,16 +168,20 @@ function refreshSettingsIfVisible() {
 
 function ensureFirebase() {
   if (!_firebaseReady) {
-    _firebaseReady = import('./firebase.js').then(async ({ initFirebase, onAuthChange, uploadLocalToFirestore, syncOfflineQueue, getLastSyncTime }) => {
+    _firebaseReady = import('./firebase.js').then(async ({ initFirebase, onAuthChange, downloadCloudToLocal, uploadLocalToFirestore, syncOfflineQueue, getLastSyncTime }) => {
       onAuthChange(user => {
         const prev = window.__ketoUser;
         window.__ketoUser = user || null;
         if (!!prev !== !!user) {
           refreshSettingsIfVisible();
           if (user) {
-            // New login: upload local data then sync
+            // New login: cloud-first strategy
+            // 1. Download cloud data to local (ensure we have all cloud records)
+            // 2. Upload any new local data to cloud
+            // 3. Sync offline queue
             updateSyncBar('syncing');
-            uploadLocalToFirestore()
+            downloadCloudToLocal()
+              .then(() => uploadLocalToFirestore())
               .then(() => syncOfflineQueue())
               .then(() => {
                 updateSyncBar('done', formatSyncTime(getLastSyncTime()));

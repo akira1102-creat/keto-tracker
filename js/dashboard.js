@@ -1,4 +1,4 @@
-import { getLocalLog, saveLocalLog, calcDayTotals, calcKetoStatus, getTodayStr, getLocalProfile } from './store.js';
+import { getLocalLog, calcKetoStatus, getTodayStr, getLocalProfile } from './store.js';
 import { showToast, deleteMeal } from './camera.js';
 import { navigate } from './router.js';
 

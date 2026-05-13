@@ -146,6 +146,25 @@ keto-tracker/
 - `onAuthStateChanged` 觸發時：更新 `window.__ketoUser`，若設定頁可見則 `renderSettings()` 重新渲染
 - 首次登入觸發 `uploadLocalToFirestore()` 將本地所有紀錄批次上傳至 Firestore
 
+### 同步策略：雲端優先
+
+自 v2.4.0 起，採用「雲端優先」策略：
+
+**登入後同步流程：**
+1. `downloadCloudToLocal()` — 先下載雲端所有記錄到本地
+2. `uploadLocalToFirestore()` — 再上傳本地新資料到雲端
+3. `syncOfflineQueue()` — 最後同步離線隊列
+
+**讀取記錄時的行為：**
+- `getDailyLog(dateStr)`：優先從雲端讀取，然後同步到本地
+- `getHistoryLogs(months)`：優先從雲端拉取最新，同步到本地
+- `getUserProfile()`：優先從雲端讀取用戶設定
+
+**影響：**
+- 新裝置登入時能獲得所有雲端歷史記錄
+- 不同裝置間資料保持最新一致
+- 本地資料若有衝突會被雲端覆蓋
+
 ### Service Worker BYPASS_ORIGINS
 
 以下 domain 必須在 `sw.js` 的 `BYPASS_ORIGINS` 中：

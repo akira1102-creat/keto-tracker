@@ -1,4 +1,4 @@
-import { getLocalHistory, getLocalLog, saveLocalLog, calcDayTotals, calcKetoStatus, getLocalProfile } from './store.js';
+import { getLocalHistory, getLocalLog, calcKetoStatus, getLocalProfile } from './store.js';
 import { showToast, deleteMeal } from './camera.js';
 import { navigate } from './router.js';
 
@@ -27,18 +27,11 @@ function _renderHistoryInner(container) {
     byMonth[key].push(log);
   }
 
-  const carbLimit = profile.carb_limit_g || 25;
-
-  // 生酮狀態標籤：只要碳水符合設定值就是生酮中，無問題
   function getStatusDisplay(log) {
-    const carb = log.total_carb_g || 0;
-    if (carb <= carbLimit) {
-      return { dot: 'keto', label: '🟢 生酮中', labelClass: 'status-keto' };
-    } else if (carb <= carbLimit * 1.5) {
-      return { dot: 'edge', label: '🟡 邊緣狀態', labelClass: 'status-edge' };
-    } else {
-      return { dot: 'risk', label: '🔴 出酮風險', labelClass: 'status-risk' };
-    }
+    const status = calcKetoStatus(log, profile);
+    if (status === 'risk') return { dot: 'risk', label: '🔴 出酮風險', labelClass: 'status-risk' };
+    if (status === 'edge') return { dot: 'edge', label: '🟡 邊緣狀態', labelClass: 'status-edge' };
+    return { dot: 'keto', label: '🟢 生酮中', labelClass: 'status-keto' };
   }
 
   let html = `<div class="page"><div class="page-header"><span style="font-size:24px">📅</span><h1>歷史記錄</h1></div>`;

@@ -1,5 +1,5 @@
 import { analyzeImage } from './claude.js';
-import { getLocalLog, saveLocalLog, calcDayTotals, calcKetoStatus, getTodayStr, getLocalProfile } from './store.js';
+import { getLocalLog, saveLocalLog, calcDayTotals, calcKetoStatus, getTodayStr, getLocalProfile, removeMealFromLog } from './store.js';
 import { navigate } from './router.js';
 
 const MAX_DIM = 1024;
@@ -11,6 +11,13 @@ window.__ketoAnalysis = window.__ketoAnalysis || {
   imageBase64: null,
   imageMime: 'image/jpeg',
 };
+
+function setAnalysisState(state, data = null, errorMsg = '') {
+  Object.assign(window.__ketoAnalysis, { status: state, data, errorMsg });
+  window.dispatchEvent(new CustomEvent('keto-analysis-change'));
+}
+
+window.addEventListener('keto-analysis-change', updateGlobalAnalysisBanner);
 
 export function updateNavBadge() {
   const badge = document.querySelector('.nav-btn[data-page="record"] .nav-badge');
@@ -66,8 +73,7 @@ function updateGlobalAnalysisBanner() {
     };
     document.getElementById('banner-dismiss')?.addEventListener('click', e => {
       e.stopPropagation();
-      window.__ketoAnalysis.status = 'idle';
-      updateNavBadge();
+      setAnalysisState('idle', null, '');
       banner.remove();
     });
     // 震動提示（如支援）
@@ -87,10 +93,7 @@ document.addEventListener('visibilitychange', () => {
       clearTimeout(_bgCheckTimer);
       _bgCheckTimer = setTimeout(() => {
         if (window.__ketoAnalysis.status === 'running') {
-          window.__ketoAnalysis.status = 'error';
-          window.__ketoAnalysis.errorMsg = '後台中斷，請重試';
-          updateNavBadge();
-          updateGlobalAnalysisBanner();
+          setAnalysisState('error', window.__ketoAnalysis.data, '後台中斷，請重試');
           const analyzingSection = document.getElementById('analyzing-section');
           const manualSection = document.getElementById('manual-section');
           if (analyzingSection) analyzingSection.classList.add('hidden');
@@ -119,11 +122,7 @@ async function saveLogCloud(dateStr, log) {
 
 // 刪除指定日期的餐點並同步
 export async function deleteMeal(dateStr, mealId) {
-  const log = getLocalLog(dateStr);
-  log.meals = (log.meals || []).filter(m => m.id !== mealId);
-  const totals = calcDayTotals(log.meals);
-  const profile = getLocalProfile();
-  Object.assign(log, totals, { date: dateStr, keto_status: calcKetoStatus(totals, profile) });
+  const log = removeMealFromLog(dateStr, mealId);
   await saveLogCloud(dateStr, log);
 }
 
@@ -296,10 +295,7 @@ export function renderRecord(container) {
   document.getElementById('btn-analyze').addEventListener('click', doAnalyze);
   document.getElementById('btn-reanalyze').addEventListener('click', () => {
     resultSection.classList.add('hidden');
-    window.__ketoAnalysis.status = 'idle';
-    window.__ketoAnalysis.data = null;
-    updateNavBadge();
-    updateGlobalAnalysisBanner();
+    setAnalysisState('idle', null, '');
     uploadSection.classList.remove('hidden');
   });
   document.getElementById('btn-save-meal').addEventListener('click', saveMeal);
@@ -331,11 +327,8 @@ export function renderRecord(container) {
 
   function resetToUpload() {
     currentImageBase64 = null; analysisData = null; previewImg.src = '';
-    window.__ketoAnalysis.status = 'idle';
-    window.__ketoAnalysis.data = null;
+    setAnalysisState('idle', null, '');
     window.__ketoAnalysis.imageBase64 = null;
-    updateNavBadge();
-    updateGlobalAnalysisBanner();
     uploadSection.classList.remove('hidden');
     previewSection.classList.add('hidden');
     resultSection.classList.add('hidden');
@@ -349,21 +342,14 @@ export function renderRecord(container) {
     if (!apiKey) { showToast('請先在設定頁面輸入 Gemini API Key'); return; }
     previewSection.classList.add('hidden');
     analyzingSection.classList.remove('hidden');
-    window.__ketoAnalysis.status = 'running';
-    window.__ketoAnalysis.data = null;
-    window.__ketoAnalysis.errorMsg = '';
+    setAnalysisState('running', null, '');
     window.__ketoAnalysis._bgAt = null;
-    updateNavBadge();
-    updateGlobalAnalysisBanner();
     try {
       const result = await analyzeImage(currentImageBase64, currentMimeType);
       clearTimeout(_bgCheckTimer);
       if (window.__ketoAnalysis.status !== 'running') return;
       analysisData = result;
-      window.__ketoAnalysis.status = 'done';
-      window.__ketoAnalysis.data = result;
-      updateNavBadge();
-      updateGlobalAnalysisBanner();
+      setAnalysisState('done', result, '');
       analyzingSection.classList.add('hidden');
       renderResult(result);
       resultSection.classList.remove('hidden');
@@ -376,10 +362,7 @@ export function renderRecord(container) {
       else if (/timeout|time.?out|timedout/i.test(err.message)) msg = '分析逾時，請重試';
       else if (/network|fetch|failed to fetch/i.test(err.message)) msg = '網絡中斷，請重試';
       else if (/AbortError/i.test(err.name)) msg = '後台中斷，請重試';
-      window.__ketoAnalysis.status = 'error';
-      window.__ketoAnalysis.errorMsg = msg;
-      updateNavBadge();
-      updateGlobalAnalysisBanner();
+      setAnalysisState('error', window.__ketoAnalysis.data, msg);
       analyzingSection.classList.add('hidden');
       showToast(msg);
       manualSection.classList.remove('hidden');
@@ -452,11 +435,8 @@ export function renderRecord(container) {
       source: 'camera',
       notes: data?.notes || '',
     };
-    window.__ketoAnalysis.status = 'idle';
-    window.__ketoAnalysis.data = null;
+    setAnalysisState('idle', null, '');
     window.__ketoAnalysis.imageBase64 = null;
-    updateNavBadge();
-    updateGlobalAnalysisBanner();
     await persistMeal(meal, dateStr);
   }
 
@@ -468,6 +448,7 @@ export function renderRecord(container) {
     const protein = Number(document.getElementById('manual-protein').value) || 0;
     const carb = Number(document.getElementById('manual-carb').value) || 0;
     const caloriesRaw = document.getElementById('manual-calories').value;
+    setAnalysisState('idle', null, '');
     await persistMeal({
       id: Date.now().toString(),
       timestamp: new Date().toISOString(),
