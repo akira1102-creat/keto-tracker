@@ -5,6 +5,13 @@
 **每次對任何檔案作出修改並 commit 之前，必須先 bump `sw.js` 的 Cache 版本號。**
 **同時必須更新 `js/settings.js` 頂部的 `APP_VERSION` 常數，與 `sw.js` 版本保持一致。**
 
+### 兩步必做（每次更新）
+
+1. **bump `sw.js` 第一行 `CACHE_VERSION`**（例 `v2.3.6` → `v2.3.7`）
+2. **更新 `js/settings.js` 頂部 `APP_VERSION`** 與 sw.js 保持一致
+
+> 缺少任何一步 → 用戶瀏覽器繼續使用舊快取 → 新代碼無法生效。
+
 ---
 
 ## Service Worker Cache 版本規則
@@ -21,8 +28,8 @@ v<major>.<minor>.<patch>
 
 | 檔案 | 位置 | 範例 |
 |------|------|------|
-| `sw.js` | 第一行 `CACHE_VERSION` | `const CACHE_VERSION = 'v2.3.0';` |
-| `js/settings.js` | 頂部 `APP_VERSION` | `const APP_VERSION = 'v2.3.0';` |
+| `sw.js` | 第一行 `CACHE_VERSION` | `const CACHE_VERSION = 'v2.3.6';` |
+| `js/settings.js` | 頂部 `APP_VERSION` | `const APP_VERSION = 'v2.3.6';` |
 
 ### Bump 規則
 
@@ -31,10 +38,6 @@ v<major>.<minor>.<patch>
 | 任何 JS / CSS / HTML 修改 | patch +1（例 v2.1.6 → v2.1.7） |
 | 新增重要功能 | minor +1，patch 歸零（例 v2.2.0） |
 | 結構性重寫 | major +1，其餘歸零（例 v3.0.0） |
-
-### 為何重要
-
-不 bump 版本 → 用家瀏覽器繼續使用舊 Service Worker 快取 → 新代碼無法生效 → 用家看到的永遠是舊版本。
 
 ---
 
@@ -84,7 +87,7 @@ keto-tracker/
 ├── css/
 │   └── style.css
 ├── js/
-│   ├── app.js          # 初始化、routing、PWA install prompt
+│   ├── app.js          # 初始化、routing、PWA install prompt、sync status bar
 │   ├── router.js       # 頁面切換，避免循環 import
 │   ├── store.js        # localStorage 讀寫，零網絡請求
 │   ├── camera.js       # 記錄頁面（拍照 / 上傳 / 手動輸入 / 日期選擇）
@@ -124,21 +127,28 @@ keto-tracker/
 | `keto_profile` | 用戶目標設定 |
 | `keto_log_YYYY-MM-DD` | 當日餐點記錄 |
 | `keto_claude_api_key` | Gemini API Key |
+| `keto_last_sync` | 最後成功同步時間（ISO string）|
+| `keto_offline_queue` | 離線期間待上傳的記錄隊列 |
 
-### Firebase / Google 登入
+### Firebase / 雲端同步架構
 
 - `firebase.js` 採用 **lazy import**，只在用戶主動登入時才載入
 - 絕對不可在 `app.js` 頂層 `import firebase.js`，否則會阻塞主載入
-- **Google 登入使用 `signInWithRedirect`（非 `signInWithPopup`）**
-  - iOS Safari PWA 模式會封鎖 popup，必須用 redirect 方式
-  - `signInWithRedirect()` 會立即跳頁，**不會 resolve**，不可用 `await` 等待結果
-  - 登入結果在 app 重新載入後由 `initFirebase()` 中的 `getRedirectResult()` 處理
-  - `settings.js` 的登入按鈕只需 trigger redirect，顯示「跳轉中...」即可，不加 try/catch 包住整個流程
-- `sw.js` 的 `BYPASS_ORIGINS` 必須包含所有 Google / Firebase 域名，確保 SW 不攔截 auth redirect
+- **餐點儲存必須同時呼叫 `saveLogCloud()`**（camera.js 的 `persistMeal()`）
+  - `saveLogCloud()` 先寫 localStorage，再 lazy import firebase.js 寫 Firestore
+  - 未登入時只寫 localStorage，登入後 `uploadLocalToFirestore()` 補傳
+- **同步狀態列**由 `app.js` 的 `updateSyncBar()` 管理，監聽 `keto-synced` 事件
+
+### Google 登入流程
+
+- **Desktop / Android Chrome**：`signInWithPopup` → popup 視窗關閉後 `onAuthStateChanged` 觸發
+- **iOS Safari / PWA standalone**：`signInWithRedirect` → 跳頁，返回後 `getRedirectResult()` 處理
+- `onAuthStateChanged` 觸發時：更新 `window.__ketoUser`，若設定頁可見則 `renderSettings()` 重新渲染
+- 首次登入觸發 `uploadLocalToFirestore()` 將本地所有紀錄批次上傳至 Firestore
 
 ### Service Worker BYPASS_ORIGINS
 
-以下 domain 必須在 `sw.js` 的 `BYPASS_ORIGINS` 中，確保 Google Auth redirect 不被 SW 攔截：
+以下 domain 必須在 `sw.js` 的 `BYPASS_ORIGINS` 中：
 
 ```js
 const BYPASS_ORIGINS = [
