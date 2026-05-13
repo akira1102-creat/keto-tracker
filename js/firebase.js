@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getFirestore, doc, getDoc, setDoc, collection, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { getFirestore, doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 const FIREBASE_CONFIG = {
@@ -15,8 +15,17 @@ let db = null;
 let auth = null;
 let currentUser = undefined;
 let _authCallback = null;
+// Queue of user values received before _authCallback was set
+let _pendingAuthUser = undefined;
 
-export function onAuthChange(fn) { _authCallback = fn; }
+export function onAuthChange(fn) {
+  _authCallback = fn;
+  // If auth already fired before the callback was registered, replay it now
+  if (_pendingAuthUser !== undefined) {
+    fn(_pendingAuthUser);
+    _pendingAuthUser = undefined;
+  }
+}
 
 export async function initFirebase() {
   const app = initializeApp(FIREBASE_CONFIG);
@@ -25,14 +34,21 @@ export async function initFirebase() {
 
   onAuthStateChanged(auth, user => {
     currentUser = user;
-    if (_authCallback) _authCallback(user);
+    if (_authCallback) {
+      _authCallback(user);
+    } else {
+      // Store latest value so onAuthChange() can replay it
+      _pendingAuthUser = user;
+    }
   });
 
+  // Handle redirect result (iOS PWA / standalone)
   try {
     const result = await getRedirectResult(auth);
     if (result?.user) {
       currentUser = result.user;
       if (_authCallback) _authCallback(result.user);
+      else _pendingAuthUser = result.user;
     }
   } catch (e) {
     console.warn('getRedirectResult error:', e.code, e.message);
@@ -96,12 +112,11 @@ export async function saveUserProfile(profile) {
 
 // ===== Daily Logs =====
 export async function getDailyLog(dateStr) {
-  // Always try Firestore first when logged in
   if (db && currentUser) {
     try {
       const snap = await getDoc(doc(db, 'users', currentUser.uid, 'daily_logs', dateStr));
       if (snap.exists()) {
-        saveLocalLog(dateStr, snap.data()); // update local cache
+        saveLocalLog(dateStr, snap.data());
         return snap.data();
       }
     } catch (e) { console.warn('getDailyLog Firestore error:', e); }
@@ -110,19 +125,20 @@ export async function getDailyLog(dateStr) {
 }
 
 export async function saveDailyLog(dateStr, logData) {
-  saveLocalLog(dateStr, logData);
+  // Always ensure date field is present in the document
+  const data = { ...logData, date: dateStr };
+  saveLocalLog(dateStr, data);
   if (!db || !currentUser) {
-    // Queue for later sync
     try {
       const q = JSON.parse(localStorage.getItem('keto_offline_queue') || '[]');
       const idx = q.findIndex(i => i.dateStr === dateStr);
-      if (idx >= 0) q[idx] = { dateStr, logData }; else q.push({ dateStr, logData });
+      if (idx >= 0) q[idx] = { dateStr, logData: data }; else q.push({ dateStr, logData: data });
       localStorage.setItem('keto_offline_queue', JSON.stringify(q));
     } catch {}
     return;
   }
   try {
-    await setDoc(doc(db, 'users', currentUser.uid, 'daily_logs', dateStr), logData, { merge: true });
+    await setDoc(doc(db, 'users', currentUser.uid, 'daily_logs', dateStr), data, { merge: true });
     saveSyncTime();
     window.dispatchEvent(new CustomEvent('keto-synced'));
   } catch (e) { console.warn('Log save failed:', e); }
@@ -131,13 +147,17 @@ export async function saveDailyLog(dateStr, logData) {
 export async function getHistoryLogs(months = 3) {
   if (db && currentUser) {
     try {
+      // Use doc ID (= dateStr) ordering — avoids composite index requirement.
+      // Filter client-side to the requested months window.
       const cutoff = new Date();
       cutoff.setMonth(cutoff.getMonth() - months);
       const cutoffStr = cutoff.toISOString().split('T')[0];
       const colRef = collection(db, 'users', currentUser.uid, 'daily_logs');
-      const q = query(colRef, where('date', '>=', cutoffStr), orderBy('date', 'desc'), limit(100));
+      const q = query(colRef, orderBy('__name__', 'desc'), limit(200));
       const snap = await getDocs(q);
-      const remote = snap.docs.map(d => d.data());
+      const remote = snap.docs
+        .filter(d => d.id >= cutoffStr)
+        .map(d => ({ date: d.id, ...d.data() }));
       if (remote.length > 0) return remote;
     } catch (e) { console.warn('getHistoryLogs error:', e); }
   }
@@ -150,7 +170,7 @@ export async function uploadLocalToFirestore() {
   const logs = getLocalHistory();
   if (!logs.length) return;
   const batch = logs.map(log =>
-    setDoc(doc(db, 'users', currentUser.uid, 'daily_logs', log.date), log, { merge: true })
+    setDoc(doc(db, 'users', currentUser.uid, 'daily_logs', log.date), { ...log, date: log.date }, { merge: true })
   );
   try {
     await Promise.all(batch);

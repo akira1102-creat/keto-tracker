@@ -2,7 +2,7 @@ import { getLocalProfile, saveLocalProfile } from './store.js';
 import { getTodayStr } from './store.js';
 import { showToast } from './camera.js';
 
-const APP_VERSION = 'v2.3.6';
+const APP_VERSION = 'v2.3.7';
 
 export function renderSettings(container) {
   const profile = getLocalProfile();
@@ -102,10 +102,9 @@ export function renderSettings(container) {
     const btn = document.getElementById('btn-signin');
     btn.textContent = '\u8DF3\u8F49\u81F3 Google \u767B\u5165\u4E2D...';
     btn.disabled = true;
-    // Ensure Firebase is ready before calling signIn
     window.ketoSignIn().catch(err => {
       console.error('SignIn failed:', err);
-      renderSettings(container); // reset UI
+      renderSettings(container);
       showToast('\u767B\u5165\u5931\u6557\uFF0C\u8ACB\u91CD\u8A66');
     });
   });
@@ -117,22 +116,24 @@ export function renderSettings(container) {
   });
 
   document.getElementById('btn-clear-today')?.addEventListener('click', () => {
-    if (!confirm('\u78BA\u5B9A\u6E05\u9664\u4ECA\u65E5\u6240\u6709\u7D00\u9304\uFF1F')) return;
-    const dateStr = getTodayStr();
-    localStorage.removeItem(`keto_log_${dateStr}`);
-    showToast('\u4ECA\u65E5\u7D00\u9304\u5DF2\u6E05\u9664');
+    const today = getTodayStr();
+    localStorage.removeItem(`keto_log_${today}`);
+    showToast('\u2713 \u4ECA\u65E5\u7D00\u9304\u5DF2\u6E05\u9664');
   });
 
   document.getElementById('btn-export')?.addEventListener('click', () => {
-    const data = {};
+    const logs = [];
     for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k?.startsWith('keto_')) data[k] = localStorage.getItem(k);
+      const key = localStorage.key(i);
+      if (key?.startsWith('keto_log_')) {
+        try { logs.push(JSON.parse(localStorage.getItem(key))); } catch {}
+      }
     }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    logs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const blob = new Blob([JSON.stringify({ exported_at: new Date().toISOString(), logs }, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `keto-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `keto-backup-${getTodayStr()}.json`;
     a.click();
   });
 }
