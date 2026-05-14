@@ -13,7 +13,14 @@ export function navigate(page) {
   });
   const main = document.getElementById('main-content');
   main.innerHTML = '';
-  if (_handlers[page]) _handlers[page](main);
+  if (_handlers[page]) {
+    try {
+      _handlers[page](main);
+    } catch (err) {
+      console.error(`[keto] render error on page "${page}":`, err);
+      main.innerHTML = `<div class="page"><div class="empty-state" style="padding:48px 0"><div style="font-size:32px">⚠️</div><p>頁面載入失敗<br><small style="color:var(--color-text-muted)">${err.message}</small></p></div></div>`;
+    }
+  }
 }
 
 export function currentPage() { return _currentPage; }

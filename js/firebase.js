@@ -200,6 +200,8 @@ export async function downloadCloudToLocal() {
       saveLocalLog(log.date, log);
     }
     
+    saveSyncTime();
+    window.dispatchEvent(new CustomEvent('keto-synced'));
     console.log(`[keto] downloaded ${cloudLogs.length} logs from Firestore to local`);
   } catch (e) {
     console.warn('downloadCloudToLocal error:', e);
