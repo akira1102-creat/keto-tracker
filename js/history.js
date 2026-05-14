@@ -9,6 +9,7 @@ export function renderHistory(container) {
 function _renderHistoryInner(container) {
   const logs = getLocalHistory();
   const profile = getLocalProfile();
+  const carbLimit = profile.carb_limit_g || 25;
 
   if (!logs.length) {
     container.innerHTML = `
