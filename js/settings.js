@@ -1,5 +1,4 @@
-import { getLocalProfile, saveLocalProfile } from './store.js';
-import { getTodayStr } from './store.js';
+import { getLocalProfile, saveLocalProfile, getLocalHistory, getTodayStr } from './store.js';
 import { showToast } from './camera.js';
 
 export const APP_VERSION = 'v2.4.0';
@@ -99,6 +98,16 @@ export function renderSettings(container) {
   });
 
   document.getElementById('btn-signin')?.addEventListener('click', () => {
+    const localLogs = getLocalHistory();
+    if (localLogs.length > 0) {
+      const ok = confirm(
+        `\u4F60\u6709 ${localLogs.length} \u7B46\u672C\u6A5F\u8A18\u9304\u3002\n\n` +
+        `\u767B\u5165\u5F8C\uFF0C\u96F2\u7AEF\u8A18\u9304\u5C07\u8986\u84CB\u672C\u6A5F\u8A18\u9304\uFF08\u96F2\u7AEF\u70BA\u6E96\uFF09\u3002` +
+        `\u5982\u672C\u6A5F\u6709\u91CD\u8981\u8A18\u9304\uFF0C\u5EFA\u8B70\u5148\u9EDE\u64CA\u300C\u532F\u51FA JSON \u5099\u4EFD\u300D\u518D\u767B\u5165\u3002\n\n` +
+        `\u78BA\u5B9A\u7E7C\u7E8C\u767B\u5165\uFF1F`
+      );
+      if (!ok) return;
+    }
     const btn = document.getElementById('btn-signin');
     btn.textContent = '\u8DF3\u8F49\u81F3 Google \u767B\u5165\u4E2D...';
     btn.disabled = true;

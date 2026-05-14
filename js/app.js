@@ -2,7 +2,7 @@ import { renderRecord } from './camera.js';
 import { renderDashboard } from './dashboard.js';
 import { renderHistory } from './history.js';
 import { renderSettings, APP_VERSION } from './settings.js';
-import { navigate, registerPages } from './router.js';
+import { navigate, registerPages, currentPage } from './router.js';
 
 // ===== Version check: auto-clear cache when version changes =====
 (async () => {
@@ -168,23 +168,23 @@ function refreshSettingsIfVisible() {
 
 function ensureFirebase() {
   if (!_firebaseReady) {
-    _firebaseReady = import('./firebase.js').then(async ({ initFirebase, onAuthChange, downloadCloudToLocal, uploadLocalToFirestore, syncOfflineQueue, getLastSyncTime }) => {
+    _firebaseReady = import('./firebase.js').then(async ({ initFirebase, onAuthChange, downloadCloudToLocal, syncOfflineQueue, getLastSyncTime }) => {
       onAuthChange(user => {
         const prev = window.__ketoUser;
         window.__ketoUser = user || null;
         if (!!prev !== !!user) {
           refreshSettingsIfVisible();
           if (user) {
-            // New login: cloud-first strategy
-            // 1. Download cloud data to local (ensure we have all cloud records)
-            // 2. Upload any new local data to cloud
-            // 3. Sync offline queue
+            // New login: cloud-first — download cloud, then sync offline queue only
+            // Never upload local data to cloud (cloud is always master)
             updateSyncBar('syncing');
             downloadCloudToLocal()
-              .then(() => uploadLocalToFirestore())
               .then(() => syncOfflineQueue())
               .then(() => {
                 updateSyncBar('done', formatSyncTime(getLastSyncTime()));
+                // Re-render current page to reflect fresh cloud data
+                const page = currentPage();
+                if (page === 'dashboard' || page === 'history') navigate(page);
               })
               .catch(() => updateSyncBar('error'));
           }
