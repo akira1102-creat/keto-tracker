@@ -17,9 +17,9 @@ export function renderDashboard(container) {
   const proteinGoal = goal * (profile.protein_pct_goal || 25) / 100 / 4;
 
   const statusConfig = {
-    keto: { label: '\uD83D\uDFE2 \u5728\u9162\u4E2D', cls: 'keto', sub: '\u78B3\u6C34\u5728\u76EE\u6A19\u5167\uFF0C\u7E7C\u7E8C\u4FDD\u6301\uFF01' },
+    keto: { label: '\uD83D\uDFE2 \u5728\u916E\u4E2D', cls: 'keto', sub: '\u78B3\u6C34\u5728\u76EE\u6A19\u5167\uFF0C\u7E7C\u7E8C\u4FDD\u6301\uFF01' },
     edge: { label: '\uD83D\uDFE1 \u908A\u7DE3\u72C0\u614B', cls: 'edge', sub: '\u63A5\u8FD1\u78B3\u6C34\u4E0A\u9650\uFF0C\u6CE8\u610F\u98F2\u98DF' },
-    risk: { label: '\uD83D\uDD34 \u51FA\u9162\u98A8\u96AA', cls: 'risk', sub: '\u78B3\u6C34\u651D\u53D6\u904E\u591A\uFF0C\u8ABF\u6574\u98F2\u98DF' },
+    risk: { label: '\uD83D\uDD34 \u51FA\u916E\u98A8\u96AA', cls: 'risk', sub: '\u78B3\u6C34\u651D\u53D6\u904E\u591A\uFF0C\u8ABF\u6574\u98F2\u98DF' },
   };
   const sc = statusConfig[status] || statusConfig.keto;
   const caloriePct = Math.min(100, Math.round(totals.total_calories / goal * 100));

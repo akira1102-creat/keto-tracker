@@ -1,7 +1,7 @@
 import { getLocalProfile, saveLocalProfile, getLocalHistory, getTodayStr } from './store.js';
 import { showToast } from './camera.js';
 
-export const APP_VERSION = 'v2.4.1';
+export const APP_VERSION = 'v2.4.2';
 
 export function renderSettings(container) {
   const profile = getLocalProfile();
