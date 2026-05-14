@@ -169,27 +169,29 @@ function refreshSettingsIfVisible() {
 function ensureFirebase() {
   if (!_firebaseReady) {
     _firebaseReady = import('./firebase.js').then(async ({ initFirebase, onAuthChange, downloadCloudToLocal, syncOfflineQueue, getLastSyncTime }) => {
+
+      let _syncedUid = null;
+
+      function doSync(user) {
+        if (!user || _syncedUid === user.uid) return;
+        _syncedUid = user.uid;
+        updateSyncBar('syncing');
+        downloadCloudToLocal()
+          .then(() => syncOfflineQueue())
+          .then(() => {
+            updateSyncBar('done', formatSyncTime(getLastSyncTime()));
+            navigate(currentPage());
+          })
+          .catch(() => updateSyncBar('error'));
+      }
+
       onAuthChange(user => {
-        const prev = window.__ketoUser;
         window.__ketoUser = user || null;
-        if (!!prev !== !!user) {
-          refreshSettingsIfVisible();
-          if (user) {
-            // New login: cloud-first — download cloud, then sync offline queue only
-            // Never upload local data to cloud (cloud is always master)
-            updateSyncBar('syncing');
-            downloadCloudToLocal()
-              .then(() => syncOfflineQueue())
-              .then(() => {
-                updateSyncBar('done', formatSyncTime(getLastSyncTime()));
-                // Re-render current page to reflect fresh cloud data
-                const page = currentPage();
-                if (page === 'dashboard' || page === 'history') navigate(page);
-              })
-              .catch(() => updateSyncBar('error'));
-          }
-        }
+        if (!user) _syncedUid = null;
+        refreshSettingsIfVisible();
+        doSync(user);
       });
+
       return initFirebase();
     });
   }
